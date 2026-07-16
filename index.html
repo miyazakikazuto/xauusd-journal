@@ -385,9 +385,40 @@ tbody tr:last-child td { border-bottom: none; }
   gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
-  padding: 8px 0 24px;
+  padding: 16px 0 0;
 }
 .footer-actions .btn { font-size: 13px; }
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+}
+.tab-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.tab-btn:hover { color: var(--text); background: var(--surface-2); }
+.tab-btn.active {
+  background: var(--gold);
+  color: #000;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
 
 /* Tooltip / modal overlay */
 .modal-overlay {
@@ -487,8 +518,14 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="stat-card"><div class="label">Kepatuhan Plan</div><div class="value gold" id="statCompliance">0%</div></div>
   </div>
 
-  <!-- Form -->
-  <div class="section">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="input">📝 Input</button>
+    <button class="tab-btn" data-tab="riwayat">📊 Riwayat</button>
+    <button class="tab-btn" data-tab="analisis">🧠 Analisis</button>
+  </div>
+
+  <!-- Tab Input -->
+  <div class="section tab-content active" id="tab-input">
     <div class="section-title" id="formTitle">📝 INPUT TRADE</div>
     <form id="tradeForm">
       <div class="form-row">
@@ -601,8 +638,8 @@ tbody tr:last-child td { border-bottom: none; }
     </form>
   </div>
 
-  <!-- History -->
-  <div class="section">
+  <!-- Tab Riwayat -->
+  <div class="section tab-content" id="tab-riwayat">
     <div class="section-title">📊 RIWAYAT TRADE</div>
     <div class="filter-bar" id="filterBar">
       <div class="filter-group">
@@ -668,21 +705,29 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="empty-state" id="emptyState">
       <div class="icon">📭</div>
       <h3>Belum ada data trade</h3>
-      <p>Mulai catat trade pertama Anda melalui form di atas.</p>
+      <p>Mulai catat trade pertama Anda melalui tab Input.</p>
     </div>
     <div class="empty-state" id="emptyFilter" style="display:none">
       <div class="icon">🔍</div>
       <h3>Tidak ada trade yang cocok</h3>
       <p>Coba ubah filter atau search Anda.</p>
     </div>
+    <div class="footer-actions">
+      <button class="btn btn-secondary" onclick="exportJSON()">📥 Export JSON</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">📤 Import JSON</button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importJSON(event)">
+      <button class="btn btn-danger" onclick="confirmClear()">🗑 Hapus Semua</button>
+    </div>
   </div>
 
-  <!-- Actions -->
-  <div class="footer-actions">
-    <button class="btn btn-secondary" onclick="exportJSON()">📥 Export JSON</button>
-    <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">📤 Import JSON</button>
-    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importJSON(event)">
-    <button class="btn btn-danger" onclick="confirmClear()">🗑 Hapus Semua</button>
+  <!-- Tab Analisis -->
+  <div class="section tab-content" id="tab-analisis">
+    <div class="section-title">🧠 ANALISIS</div>
+    <div class="empty-state">
+      <div class="icon">🔬</div>
+      <h3>Analisis psikologi</h3>
+      <p>Segera hadir — deteksi revenge trading, FOMO, psych score, behavioral interventions.</p>
+    </div>
   </div>
 </div>
 
@@ -1180,6 +1225,21 @@ document.getElementById('modalConfirmBtn').addEventListener('click', function() 
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
+
+// Tab switching
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-tab]');
+  if (btn) switchTab(btn.dataset.tab);
+});
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+  var tab = document.getElementById('tab-' + name);
+  if (tab) tab.classList.add('active');
+  var btn = document.querySelector('[data-tab="' + name + '"]');
+  if (btn) btn.classList.add('active');
+}
 
 function deleteTrade(id) {
   openModal('Hapus Trade', 'Yakin ingin menghapus trade ini? Data tidak bisa dikembalikan.', 'Hapus', 'btn-danger', function() {
