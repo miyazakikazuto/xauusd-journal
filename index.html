@@ -51,6 +51,27 @@ header h1 {
 }
 header h1 span { color: var(--gold); }
 header p { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.header-select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.header-select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(240,185,11,0.15);
+}
 .header-badge {
   background: rgba(240,185,11,0.12);
   color: var(--gold);
@@ -334,6 +355,7 @@ tbody tr:last-child td { border-bottom: none; }
   .container { padding: 10px; }
   header { padding: 16px 18px; flex-direction: column; text-align: center; }
   header h1 { font-size: 20px; }
+  .header-right { flex-wrap: wrap; justify-content: center; }
   .section { padding: 16px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .stat-card { padding: 10px; }
@@ -349,7 +371,14 @@ tbody tr:last-child td { border-bottom: none; }
       <h1>📓 <span>TRADING JOURNAL</span></h1>
       <p>Catat. Evaluasi. Disiplin. — XAUUSD & Forex</p>
     </div>
-    <span class="header-badge">LocalStorage</span>
+    <div class="header-right">
+      <select id="accountType" class="header-select">
+        <option value="USD">🇺🇸 USD</option>
+        <option value="USDCent">💵 USDCent (×100)</option>
+        <option value="IDR">🇮🇩 IDR</option>
+      </select>
+      <span class="header-badge">LocalStorage</span>
+    </div>
   </header>
 
   <!-- Stats -->
@@ -357,7 +386,7 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="stat-card"><div class="label">Total Trades</div><div class="value gold" id="statTotal">0</div></div>
     <div class="stat-card"><div class="label">Win Rate</div><div class="value win" id="statWinRate">0%</div></div>
     <div class="stat-card"><div class="label">Total Pips</div><div class="value" id="statPips">0</div></div>
-    <div class="stat-card"><div class="label">Total USD</div><div class="value" id="statUSD">$0</div></div>
+    <div class="stat-card"><div class="label">Total P/L</div><div class="value" id="statUSD">$0</div></div>
     <div class="stat-card"><div class="label">Rata-rata Pips</div><div class="value" id="statAvgPips">0</div></div>
     <div class="stat-card"><div class="label">Win Streak</div><div class="value win" id="statWinStreak">0</div></div>
     <div class="stat-card"><div class="label">Loss Streak</div><div class="value loss" id="statLossStreak">0</div></div>
@@ -435,7 +464,7 @@ tbody tr:last-child td { border-bottom: none; }
           <input type="number" id="lot" step="0.01" value="0.01" min="0.01">
         </div>
         <div class="form-group">
-          <label for="usd">USD P/L <span class="text-muted">(auto)</span></label>
+          <label for="usd" id="usdLabel">USD P/L <span class="text-muted">(auto)</span></label>
           <input type="number" id="usd" step="any" placeholder="auto">
         </div>
       </div>
@@ -495,7 +524,7 @@ tbody tr:last-child td { border-bottom: none; }
             <th>Hasil</th>
             <th>Pips</th>
             <th>Lot</th>
-            <th>USD</th>
+            <th id="thUSD">USD</th>
             <th>Plan</th>
             <th>Emosi</th>
             <th>Catatan</th>
@@ -607,14 +636,57 @@ function autoUpdatePips() {
 }
 
 function autoUpdateUSD() {
+  const accountType = document.getElementById('accountType').value;
+  if (accountType === 'IDR') {
+    document.getElementById('usd').value = '';
+    document.getElementById('usd').placeholder = 'isi manual';
+    return;
+  }
+  document.getElementById('usd').placeholder = 'auto';
   const pips = parseFloat(document.getElementById('pips').value);
   const lot = parseFloat(document.getElementById('lot').value);
   const pair = document.getElementById('pair').value;
   if (!isNaN(pips) && !isNaN(lot) && lot > 0) {
     const pipValue = getPipValue(pair);
-    document.getElementById('usd').value = Math.round(pips * lot * pipValue * 100) / 100;
+    let result = pips * lot * pipValue;
+    if (accountType === 'USDCent') result *= 100;
+    document.getElementById('usd').value = Math.round(result * 100) / 100;
   }
 }
+
+const ACCOUNT_TYPE_KEY = 'xauusd_journal_account_type';
+
+function loadAccountType() {
+  try {
+    const saved = localStorage.getItem(ACCOUNT_TYPE_KEY);
+    if (saved) document.getElementById('accountType').value = saved;
+  } catch {}
+}
+
+function saveAccountType() {
+  localStorage.setItem(ACCOUNT_TYPE_KEY, document.getElementById('accountType').value);
+}
+
+function updateAccountLabels() {
+  const type = document.getElementById('accountType').value;
+  const label = document.getElementById('usdLabel');
+  const mappings = {
+    'USD': 'USD P/L <span class="text-muted">(auto)</span>',
+    'USDCent': 'USDC P/L <span class="text-muted">(auto ×100)</span>',
+    'IDR': 'IDR P/L <span class="text-muted">(manual)</span>'
+  };
+  label.innerHTML = mappings[type] || mappings.USD;
+  const statLabel = document.querySelector('.stat-card:nth-child(4) .label');
+  if (statLabel) statLabel.textContent = type === 'IDR' ? 'Total P/L (IDR)' : type === 'USDCent' ? 'Total P/L (¢)' : 'Total P/L';
+  const th = document.getElementById('thUSD');
+  if (th) th.textContent = type === 'IDR' ? 'IDR' : type === 'USDCent' ? 'USDC' : 'USD';
+}
+
+document.getElementById('accountType').addEventListener('change', function() {
+  saveAccountType();
+  updateAccountLabels();
+  autoUpdateUSD();
+});
 
 document.getElementById('entry').addEventListener('input', autoUpdatePips);
 document.getElementById('exit').addEventListener('input', autoUpdatePips);
@@ -647,7 +719,9 @@ function renderStats() {
   pipEl.textContent = (totalPips >= 0 ? '+' : '') + totalPips.toFixed(1);
   pipEl.className = 'value ' + (totalPips > 0 ? 'win' : totalPips < 0 ? 'loss' : 'neutral');
   const usdEl = document.getElementById('statUSD');
-  usdEl.textContent = (totalUSD >= 0 ? '+' : '') + '$' + totalUSD.toFixed(2);
+  const accountType = document.getElementById('accountType').value;
+  const symbol = accountType === 'IDR' ? 'Rp' : accountType === 'USDCent' ? '¢' : '$';
+  usdEl.textContent = (totalUSD >= 0 ? '+' : '') + symbol + totalUSD.toFixed(2);
   usdEl.className = 'value ' + (totalUSD > 0 ? 'win' : totalUSD < 0 ? 'loss' : 'neutral');
   document.getElementById('statAvgPips').textContent = avgPips.toFixed(1);
   document.getElementById('statWinStreak').textContent = curWin;
@@ -858,6 +932,8 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
 });
 
 loadTrades();
+loadAccountType();
+updateAccountLabels();
 renderAll();
 
 document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
