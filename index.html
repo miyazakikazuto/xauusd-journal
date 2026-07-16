@@ -1156,6 +1156,7 @@ function initFirebase() {
           fbUser = null;
           firebaseReady = false;
         }
+        updateSyncStatus();
         done(user ? 'logged_in' : 'not_logged_in');
       });
     } catch (e) {
