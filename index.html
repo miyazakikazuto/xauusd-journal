@@ -644,7 +644,7 @@ tbody tr:last-child td { border-bottom: none; }
 </head>
 <body>
 
-<div class="loading-overlay" id="loadingOverlay">
+<div class="loading-overlay hidden" id="loadingOverlay">
   <div class="spinner"></div>
   <div id="loadingText" style="color:var(--text-muted);font-size:14px">☁️ Menghubungkan ke cloud...</div>
 </div>
@@ -1127,12 +1127,20 @@ function isFirebaseConfigured() {
 
 function initFirebase() {
   return new Promise(function(resolve) {
-    if (!isFirebaseConfigured()) { updateSyncStatus(); resolve('offline'); return; }
+    var resolved = false;
+    function done(status) {
+      if (resolved) return;
+      resolved = true;
+      updateSyncStatus();
+      resolve(status);
+    }
+    if (!isFirebaseConfigured()) { done('offline'); return; }
     if (window.location.protocol === 'file:') {
       console.warn('Firebase: buka via http:// atau https://, bukan file://');
-      updateSyncStatus();
-      resolve('offline'); return;
+      done('offline'); return;
     }
+    // Timeout: jika Firebase tidak merespon dalam 5 detik, lanjut offline
+    setTimeout(function() { done('offline'); }, 5000);
     try {
       let app;
       try { app = firebase.initializeApp(FIREBASE_CONFIG); }
@@ -1147,13 +1155,11 @@ function initFirebase() {
           fbUser = null;
           firebaseReady = false;
         }
-        updateSyncStatus();
-        resolve(user ? 'logged_in' : 'not_logged_in');
+        done(user ? 'logged_in' : 'not_logged_in');
       });
     } catch (e) {
       console.warn('Firebase: ' + e.message);
-      updateSyncStatus();
-      resolve('offline');
+      done('offline');
     }
   });
 }
