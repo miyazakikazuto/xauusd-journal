@@ -912,8 +912,12 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="settings-card">
       <h4>👤 Edit Profile Aktif</h4>
       <div class="settings-row">
-        <label>Profile</label>
+        <label>Pilih Profile</label>
         <select id="settingsProfileSelect" style="min-width:160px"></select>
+      </div>
+      <div class="settings-row">
+        <label>Nama Profile</label>
+        <input type="text" id="settingsProfileName" placeholder="Nama profile">
       </div>
       <div class="settings-row">
         <label>Mode</label>
@@ -1437,12 +1441,14 @@ function renderSettings() {
   if (emailEl && fbUser) emailEl.textContent = fbUser.email || 'Anonymous';
   // Profile select for edit
   var selEdit = document.getElementById('settingsProfileSelect');
+  var nameInput = document.getElementById('settingsProfileName');
   var selDel = document.getElementById('settingsDeleteProfile');
   if (selEdit) {
     selEdit.innerHTML = profiles.map(function(p) { return '<option value="' + p.name + '">' + p.name + '</option>'; }).join('');
     var cur = getCurrentProfile();
     if (cur) {
       selEdit.value = cur.name;
+      if (nameInput) nameInput.value = cur.name;
       document.getElementById('settingsProfileMode').value = cur.mode;
       document.getElementById('settingsProfileType').value = cur.accountType;
     }
@@ -1474,20 +1480,53 @@ function changePassword() {
 }
 
 function saveProfileSettings() {
-  var name = document.getElementById('settingsProfileSelect').value;
+  var originalName = document.getElementById('settingsProfileSelect').value;
+  var newName = document.getElementById('settingsProfileName').value.trim();
   var mode = document.getElementById('settingsProfileMode').value;
   var type = document.getElementById('settingsProfileType').value;
-  var p = profiles.find(function(x) { return x.name === name; });
+  var p = profiles.find(function(x) { return x.name === originalName; });
   if (!p) { showFlash('Profile tidak ditemukan', 'error'); return; }
+  if (!newName) { showFlash('Nama profile tidak boleh kosong', 'error'); return; }
+  // Check name conflict (excluding self)
+  if (newName !== originalName && profiles.some(function(x) { return x.name === newName; })) {
+    showFlash('Nama "' + newName + '" sudah dipakai', 'error'); return;
+  }
+  // Rename profile if name changed
+  if (newName !== originalName) {
+    var oldKey = 'xauusd_journal_trades_' + originalName;
+    var newKey = 'xauusd_journal_trades_' + newName;
+    var tradesData = JSON.parse(localStorage.getItem(oldKey) || '[]');
+    localStorage.setItem(newKey, JSON.stringify(tradesData));
+    localStorage.removeItem(oldKey);
+    p.name = newName;
+    if (activeProfile === originalName) {
+      activeProfile = newName;
+      saveActiveProfile();
+    }
+    // Update Firestore: remove old key, set new key
+    if (firebaseReady && firestore && fbUser) {
+      var updates = {};
+      updates['trades_' + newName] = tradesData;
+      firestore.collection('users').doc(fbUser.uid).set({
+        profiles: profiles,
+        ['trades_' + newName]: tradesData
+      }, { merge: true }).then(function() {
+        firestore.collection('users').doc(fbUser.uid).update({
+          ['trades_' + originalName]: firebase.firestore.FieldValue.delete()
+        }).catch(function() {});
+      }).catch(function() {});
+    }
+  }
   p.mode = mode;
   p.accountType = type;
   saveProfiles();
-  if (activeProfile === name) {
+  if (activeProfile === newName || activeProfile === originalName) {
     renderInfoBar();
     updateAccountLabels();
   }
   renderSettings();
-  showFlash('✅ Profile "' + name + '" diupdate', 'success');
+  renderProfileSelect();
+  showFlash('✅ Profile "' + (newName || originalName) + '" diupdate', 'success');
 }
 
 function deleteProfile(name) {
@@ -1611,6 +1650,7 @@ function resetAllData() {
 document.getElementById('settingsProfileSelect') && document.getElementById('settingsProfileSelect').addEventListener('change', function() {
   var p = profiles.find(function(x) { return x.name === this.value; }.bind(this));
   if (p) {
+    document.getElementById('settingsProfileName').value = p.name;
     document.getElementById('settingsProfileMode').value = p.mode;
     document.getElementById('settingsProfileType').value = p.accountType;
   }
