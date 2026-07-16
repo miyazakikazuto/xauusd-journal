@@ -1009,11 +1009,8 @@ function loadProfiles() {
       }
       return;
     }
-    profiles = [{ name: 'Default', mode: 'Real', accountType: 'USD' }];
-    activeProfile = 'Default';
-    saveProfiles();
-    saveActiveProfile();
-  } catch { profiles = [{ name: 'Default', mode: 'Real', accountType: 'USD' }]; }
+    profiles = [];
+  } catch { profiles = []; }
 }
 
 function saveProfiles() {
@@ -1025,7 +1022,7 @@ function loadActiveProfile() {
   try {
     const saved = localStorage.getItem(ACTIVE_PROFILE_KEY);
     if (saved && profiles.some(p => p.name === saved)) activeProfile = saved;
-    else if (profiles.length > 0) { activeProfile = profiles[0].name; saveActiveProfile(); }
+    else activeProfile = '';
   } catch {}
 }
 
@@ -1150,6 +1147,12 @@ function syncFromCloud() {
   }).catch(function(e) {
     showFlash('Gagal sync: ' + e.message, 'error');
   });
+}
+
+function showFirstVisitModal() {
+  if (profiles.length === 0 && window.location.protocol !== 'file:') {
+    document.getElementById('modalAddAccount').classList.add('active');
+  }
 }
 
 document.getElementById('profileSelect').addEventListener('change', function() {
@@ -1640,6 +1643,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
 
 loadProfiles();
 loadActiveProfile();
+showFirstVisitModal();
 loadTrades();
 renderInfoBar();
 renderProfileSelect();
