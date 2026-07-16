@@ -2,6 +2,28 @@
 let trades = [];
 let pendingAction = null;
 let editingId = null;
+let sortState = { col: 'date', asc: false };
+
+function sortTrades(arr) {
+  var col = sortState.col;
+  var dir = sortState.asc ? 1 : -1;
+  return [...arr].sort(function(a, b) {
+    var va, vb;
+    switch (col) {
+      case 'pair': va = (a.pair || '').toUpperCase(); vb = (b.pair || '').toUpperCase(); break;
+      case 'direction': va = a.direction === 'BUY' ? 0 : 1; vb = b.direction === 'BUY' ? 0 : 1; break;
+      case 'date':
+        va = (a.date || '') + 'T' + (a.createdAt || '').split('T')[1] || '00:00';
+        vb = (b.date || '') + 'T' + (b.createdAt || '').split('T')[1] || '00:00';
+        break;
+      case 'entry': va = parseFloat(a.entry) || 0; vb = parseFloat(b.entry) || 0; break;
+      case 'usd': va = parseFloat(a.usd) || 0; vb = parseFloat(b.usd) || 0; break;
+      default: va = a.date || ''; vb = b.date || '';
+    }
+    if (typeof va === 'string') return va.localeCompare(vb) * dir;
+    return (va - vb) * dir;
+  });
+}
 
 function loadTrades() {
   try {
@@ -24,6 +46,32 @@ function formatDateDisplay(dateStr) {
   const p = dateStr.split('-');
   if (p.length !== 3) return dateStr;
   return `${p[2]}/${p[1]}/${p[0]}`;
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return '-';
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    return pad(d.getHours()) + ':' + pad(d.getMinutes());
+  } catch { return '-'; }
+}
+
+function calcPercentChange(entry, exit) {
+  var e = parseFloat(entry), x = parseFloat(exit);
+  if (isNaN(e) || isNaN(x) || e === 0) return '';
+  var pct = (x - e) / e * 100;
+  return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+}
+
+function getCoinClass(pair) {
+  var upper = (pair || '').toUpperCase();
+  if (upper.includes('XAU') || upper.includes('GOLD')) return 'coin-gold';
+  if (upper.includes('XAG') || upper.includes('SILVER')) return 'coin-silver';
+  if (upper.includes('BTC')) return 'coin-orange';
+  if (upper.includes('ETH')) return 'coin-purple';
+  return 'coin-blue';
 }
 
 function getPipMultiplier(pair) {
@@ -179,6 +227,30 @@ function setupFilterListeners() {
   document.getElementById('filterSearch').addEventListener('input', renderTable);
 }
 
+function renderSortIcon() {
+  ['pair', 'direction', 'date', 'entry', 'usd'].forEach(function(col) {
+    var el = document.getElementById('si-' + col);
+    if (el) {
+      el.className = 'sort-icon' + (sortState.col === col ? (sortState.asc ? ' asc' : ' desc') : '');
+    }
+  });
+}
+
+function toggleExpand(id) {
+  var detail = document.getElementById('detail-' + id);
+  var toggle = document.querySelector('[data-detail="' + id + '"] .expand-toggle');
+  if (detail && toggle) {
+    var hidden = detail.hasAttribute('hidden');
+    if (hidden) {
+      detail.removeAttribute('hidden');
+      toggle.classList.add('open');
+    } else {
+      detail.setAttribute('hidden', '');
+      toggle.classList.remove('open');
+    }
+  }
+}
+
 function renderTable() {
   var filtered = getFilteredTrades();
   var tbody = document.getElementById('tradeBody');
@@ -206,29 +278,53 @@ function renderTable() {
   emptyFilter.style.display = 'none';
   if (countEl) countEl.textContent = filtered.length + ' dari ' + trades.length + ' trade';
 
-  var sorted = [...filtered].sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
-  tbody.innerHTML = sorted.map(t => {
-    const badgeResult = t.result === 'Win' ? 'badge-win' : t.result === 'Loss' ? 'badge-loss' : 'badge-be';
-    const badgeCompliance = t.compliance === 'Yes' ? 'badge-yes' : t.compliance === 'Partial' ? 'badge-partial' : t.compliance === 'No' ? 'badge-no' : '';
-    const pipsVal = parseFloat(t.pips) || 0;
-    return `<tr>
-      <td>${escapeHtml(formatDateDisplay(t.date))}</td>
-      <td>${escapeHtml(t.session || '-')}</td>
-      <td>${escapeHtml(t.pair || '-')}</td>
-      <td style="color:${t.direction === 'BUY' ? 'var(--win)' : 'var(--loss)'};font-weight:600">${escapeHtml(t.direction || '-')}</td>
-      <td>${escapeHtml(String(t.entry || '-'))}</td>
-      <td>${escapeHtml(t.sl || '-')}</td>
-      <td>${escapeHtml(t.tp || '-')}</td>
-      <td>${escapeHtml(String(t.exit || '-'))}</td>
-      <td><span class="badge ${badgeResult}">${escapeHtml(t.result || '-')}</span></td>
-      <td class="${pipsVal > 0 ? 'text-win' : pipsVal < 0 ? 'text-loss' : ''}">${escapeHtml(t.pips || '0')}</td>
-      <td>${escapeHtml(t.lot || '0.01')}</td>
-      <td>${t.usd != null ? (getCurrentAccountType() === 'IDR' ? 'Rp' : '$') + parseFloat(t.usd).toFixed(2) : '-'}</td>
-      <td>${badgeCompliance ? '<span class="badge ' + badgeCompliance + '">' + escapeHtml(t.compliance) + '</span>' : '-'}</td>
-      <td style="font-size:12px;color:var(--text-muted)">${escapeHtml(t.emotion || '-')}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-muted)" title="${escapeHtml(t.note || '')}">${escapeHtml(t.note || '-')}</td>
-      <td><button class="btn btn-xs btn-secondary" data-edit="${escapeHtml(t.id)}" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" data-delete="${escapeHtml(t.id)}">✕</button></td>
-    </tr>`;
+  var sorted = sortTrades(filtered);
+  renderSortIcon();
+
+  var symbol = getCurrentAccountType() === 'IDR' ? 'Rp' : '$';
+
+  tbody.innerHTML = sorted.map(function(t) {
+    var pctChange = calcPercentChange(t.entry, t.exit);
+    var pctClass = '';
+    if (pctChange) {
+      var pctVal = parseFloat(pctChange);
+      pctClass = pctVal > 0 ? 'text-win' : pctVal < 0 ? 'text-loss' : '';
+    }
+    var usdVal = parseFloat(t.usd);
+    var isProfit = usdVal > 0;
+    var isLoss = usdVal < 0;
+    var pnlClass = isProfit ? 'pnl-profit' : isLoss ? 'pnl-loss' : 'pnl-be';
+    var usdDisplay = t.usd != null ? (usdVal >= 0 ? '+' : '') + symbol + usdVal.toFixed(2) : '-';
+    var dirClass = t.direction === 'BUY' ? 'long' : 'short';
+    var dirArrow = t.direction === 'BUY' ? '↗' : '↘';
+    var pipsVal = parseFloat(t.pips) || 0;
+    var detailId = escapeHtml(t.id);
+
+    var mainRow = '<tr class="main-row">' +
+      '<td><span class="expand-toggle" data-detail="' + detailId + '">›</span></td>' +
+      '<td><span class="coin-row"><span class="coin-icon ' + getCoinClass(t.pair) + '">' + t.pair.charAt(0) + '</span><span class="coin-label">' + escapeHtml(t.pair) + '</span></span></td>' +
+      '<td><span class="side-arrow ' + dirClass + '">' + dirArrow + '</span> ' + escapeHtml(t.lot || '0.01') + '<br><span class="side-size">' + usdDisplay + '</span></td>' +
+      '<td>' + escapeHtml(formatDateDisplay(t.date)) + ' <span class="connector">→</span><br><span class="side-size">' + escapeHtml(formatTimestamp(t.createdAt)) + '</span></td>' +
+      '<td>' + escapeHtml(String(t.entry || '-')) + ' <span class="connector">→</span> ' + escapeHtml(String(t.exit || '-')) + (pctChange ? '<br><span class="pct-change ' + pctClass + '">' + pctChange + '</span>' : '') + '</td>' +
+      '<td><span class="pnl-badge ' + pnlClass + '">' + usdDisplay + '</span></td>' +
+      '</tr>';
+
+    var detailRow = '<tr class="detail-row" id="detail-' + detailId + '" hidden>' +
+      '<td colspan="6"><div class="detail-grid">' +
+      '<div class="detail-item"><span class="detail-label">Session</span><span class="detail-value">' + escapeHtml(t.session || '-') + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Setup</span><span class="detail-value">' + escapeHtml(t.setup || '-') + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">SL → TP</span><span class="detail-value">' + escapeHtml(t.sl || '-') + ' → ' + escapeHtml(t.tp || '-') + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Pips</span><span class="detail-value">' + (pipsVal > 0 ? '+' : '') + escapeHtml(t.pips || '0') + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Plan</span><span class="detail-value">' + escapeHtml(t.compliance || '-') + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Emotion</span><span class="detail-value">' + escapeHtml(t.emotion || '-') + '</span></div>' +
+      (t.note ? '<div class="detail-item detail-full"><span class="detail-label">Note</span><span class="detail-value">' + escapeHtml(t.note) + '</span></div>' : '') +
+      '<div class="detail-item detail-full detail-actions">' +
+      '<button class="btn btn-xs btn-secondary" data-edit="' + detailId + '">✏️ Edit</button>' +
+      '<button class="btn btn-xs btn-danger" data-delete="' + detailId + '">✕ Hapus</button>' +
+      '</div>' +
+      '</div></td></tr>';
+
+    return mainRow + detailRow;
   }).join('');
 }
 

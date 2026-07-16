@@ -47,12 +47,28 @@ async function initApp() {
 
 initApp();
 
-// Trade action buttons (delegasi, aman dari XSS)
+// Trade table event delegation (sort, expand, actions)
 document.getElementById('tradeBody').addEventListener('click', function(e) {
   var editBtn = e.target.closest('[data-edit]');
   var delBtn = e.target.closest('[data-delete]');
+  var detailBtn = e.target.closest('[data-detail]');
   if (editBtn) editTrade(editBtn.dataset.edit);
   if (delBtn) deleteTrade(delBtn.dataset.delete);
+  if (detailBtn) toggleExpand(detailBtn.dataset.detail);
+});
+
+document.querySelector('#trades table').addEventListener('click', function(e) {
+  var th = e.target.closest('th.sortable');
+  if (th) {
+    var col = th.dataset.sort;
+    if (sortState.col === col) {
+      sortState.asc = !sortState.asc;
+    } else {
+      sortState.col = col;
+      sortState.asc = false;
+    }
+    renderTable();
+  }
 });
 
 // Modal click-outside
