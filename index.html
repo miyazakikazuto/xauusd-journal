@@ -482,6 +482,68 @@ tbody tr:last-child td { border-bottom: none; }
   .stat-card { padding: 10px; }
   .stat-card .value { font-size: 18px; }
 }
+.profile-info-bar {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.profile-info-bar strong { color: var(--text); }
+.modal .form-group {
+  text-align: left;
+  margin-bottom: 12px;
+}
+.modal .form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+.modal .form-group input,
+.modal .form-group select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+.modal .form-group input:focus,
+.modal .form-group select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(240,185,11,0.15);
+}
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  font-family: inherit;
+  line-height: 1;
+}
+.btn-icon:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(240,185,11,0.08);
+}
+.full-width { width: 100%; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -497,11 +559,8 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
     <div class="header-right">
       <select id="profileSelect" class="header-select"></select>
-      <select id="accountType" class="header-select">
-        <option value="USD">🇺🇸 USD</option>
-        <option value="USDCent">💵 USDCent (÷100)</option>
-        <option value="IDR">🇮🇩 IDR</option>
-      </select>
+      <button class="btn-icon" onclick="document.getElementById('modalAddAccount').classList.add('active')" title="Tambah Akun">➕</button>
+      <button class="btn-icon" onclick="logoutAccount()" title="Logout">⏻</button>
       <span class="header-badge badge-local" id="syncStatus">💻 Local</span>
     </div>
   </header>
@@ -527,6 +586,12 @@ tbody tr:last-child td { border-bottom: none; }
   <!-- Tab Input -->
   <div class="section tab-content active" id="tab-input">
     <div class="section-title" id="formTitle">📝 INPUT TRADE</div>
+    <div class="profile-info-bar" id="profileInfoBar"></div>
+    <select id="accountType" style="display:none">
+      <option value="USD">USD</option>
+      <option value="USDCent">USDCent</option>
+      <option value="IDR">IDR</option>
+    </select>
     <form id="tradeForm">
       <div class="form-row">
         <div class="form-group">
@@ -729,7 +794,54 @@ tbody tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
-<!-- Modal -->
+<!-- Modal Tambah Akun -->
+<div class="modal-overlay" id="modalAddAccount">
+  <div class="modal">
+    <h3>➕ Tambah Akun</h3>
+    <div class="form-group">
+      <label>Nama Akun</label>
+      <input type="text" id="newAccountName" placeholder="Contoh: Miya">
+    </div>
+    <div class="form-group">
+      <label>Mode</label>
+      <select id="newAccountMode">
+        <option value="Real">💰 Real</option>
+        <option value="Demo">🎮 Demo</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Tipe Akun</label>
+      <select id="newAccountType">
+        <option value="USD">🇺🇸 USD</option>
+        <option value="USDCent">💵 USDCent (÷100)</option>
+        <option value="IDR">🇮🇩 IDR</option>
+      </select>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closeModal('modalAddAccount')">Batal</button>
+      <button class="btn btn-gold" onclick="addAccount()">➕ Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Login -->
+<div class="modal-overlay" id="modalLogin">
+  <div class="modal">
+    <h3>🔑 Pilih Akun</h3>
+    <p>Pilih akun yang tersimpan di cloud:</p>
+    <div class="form-group">
+      <select id="loginProfileSelect" class="full-width">
+        <option value="">— Pilih akun —</option>
+      </select>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closeModal('modalLogin')">Batal</button>
+      <button class="btn btn-gold" onclick="loginToProfile()">🔑 Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">Konfirmasi</h3>
@@ -814,7 +926,7 @@ async function syncToFirestore() {
     batch.profiles = profiles;
     batch.activeProfile = activeProfile;
     batch['trades_' + activeProfile] = trades;
-    batch['account_' + activeProfile] = document.getElementById('accountType').value;
+
     await firestore.collection('users').doc(fbUser.uid).set(batch, { merge: true });
   } catch (e) {
     console.warn('Firestore sync: ' + e.message);
@@ -840,8 +952,6 @@ async function loadFromFirestore() {
       trades = data[tradeKey];
       localStorage.setItem(getTradeKey(), JSON.stringify(trades));
     }
-    const accKey = 'account_' + activeProfile;
-    if (data[accKey]) localStorage.setItem(getAccountKey(), data[accKey]);
     return true;
   } catch (e) {
     console.warn('Firestore load: ' + e.message);
@@ -852,24 +962,45 @@ async function loadFromFirestore() {
 // ===== PROFILE MANAGEMENT =====
 const PROFILES_KEY = 'xauusd_journal_profiles';
 const ACTIVE_PROFILE_KEY = 'xauusd_journal_active_profile';
-let activeProfile = 'Default';
-let profiles = ['Default'];
+let activeProfile = '';
+let profiles = [];
 
 function getTradeKey() { return 'xauusd_journal_trades_' + activeProfile; }
-function getAccountKey() { return 'xauusd_journal_account_' + activeProfile; }
+
+function getCurrentProfile() {
+  return profiles.find(p => p.name === activeProfile) || null;
+}
+
+function getCurrentAccountType() {
+  const p = getCurrentProfile();
+  return p ? p.accountType : 'USD';
+}
+
+function getCurrentMode() {
+  const p = getCurrentProfile();
+  return p ? p.mode : 'Real';
+}
 
 function loadProfiles() {
   try {
     const saved = localStorage.getItem(PROFILES_KEY);
-    if (saved) { profiles = JSON.parse(saved); return; }
-    // Migrate old single-profile data
-    const oldTrades = localStorage.getItem('xauusd_journal_trades');
-    if (oldTrades) {
-      localStorage.setItem(getTradeKey(), oldTrades);
-      localStorage.removeItem('xauusd_journal_trades');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.length > 0 && typeof parsed[0] === 'string') {
+        profiles = parsed.map(function(name) {
+          return { name: name, mode: 'Real', accountType: 'USD' };
+        });
+        saveProfiles();
+      } else {
+        profiles = parsed;
+      }
+      return;
     }
+    profiles = [{ name: 'Default', mode: 'Real', accountType: 'USD' }];
+    activeProfile = 'Default';
     saveProfiles();
-  } catch { profiles = ['Default']; }
+    saveActiveProfile();
+  } catch { profiles = [{ name: 'Default', mode: 'Real', accountType: 'USD' }]; }
 }
 
 function saveProfiles() {
@@ -880,7 +1011,8 @@ function saveProfiles() {
 function loadActiveProfile() {
   try {
     const saved = localStorage.getItem(ACTIVE_PROFILE_KEY);
-    if (saved && profiles.includes(saved)) activeProfile = saved;
+    if (saved && profiles.some(p => p.name === saved)) activeProfile = saved;
+    else if (profiles.length > 0) { activeProfile = profiles[0].name; saveActiveProfile(); }
   } catch {}
 }
 
@@ -893,42 +1025,121 @@ function renderProfileSelect() {
   const sel = document.getElementById('profileSelect');
   if (!sel) return;
   sel.innerHTML = profiles.map(function(p) {
-    return '<option value="' + p + '" ' + (p === activeProfile ? 'selected' : '') + '>📁 ' + p + '</option>';
+    return '<option value="' + p.name + '" ' + (p.name === activeProfile ? 'selected' : '') + '>👤 ' + p.name + '</option>';
   }).join('');
 }
 
+function renderInfoBar() {
+  const el = document.getElementById('profileInfoBar');
+  if (!el) return;
+  const p = getCurrentProfile();
+  if (p) {
+    const modeIcon = p.mode === 'Demo' ? '🎮' : '💰';
+    const typeFlag = p.accountType === 'IDR' ? '🇮🇩' : p.accountType === 'USDCent' ? '💵' : '🇺🇸';
+    el.innerHTML = '👤 ' + p.name + ' &bull; ' + modeIcon + ' ' + p.mode + ' &bull; ' + typeFlag + ' ' + p.accountType;
+  } else {
+    el.innerHTML = '👤 —';
+  }
+  const hiddenSelect = document.getElementById('accountType');
+  if (hiddenSelect && p) hiddenSelect.value = p.accountType;
+  updateAccountLabels();
+}
+
 function switchProfile(name) {
-  if (name === activeProfile || !profiles.includes(name)) return;
+  if (name === activeProfile || !profiles.some(p => p.name === name)) return;
   saveTrades();
   activeProfile = name;
   saveActiveProfile();
   loadTrades();
-  loadAccountType();
-  updateAccountLabels();
+  renderInfoBar();
   renderProfileSelect();
   renderAll();
 }
 
-function addProfile(name) {
-  name = name.trim();
-  if (!name || profiles.includes(name)) return false;
-  profiles.push(name);
+function addAccount() {
+  const nameEl = document.getElementById('newAccountName');
+  const modeEl = document.getElementById('newAccountMode');
+  const typeEl = document.getElementById('newAccountType');
+  const name = (nameEl.value || '').trim();
+  if (!name) { showFlash('Nama akun harus diisi', 'error'); return; }
+  if (profiles.some(p => p.name === name)) { showFlash('Nama akun sudah ada', 'error'); return; }
+  profiles.push({ name: name, mode: modeEl.value, accountType: typeEl.value });
   saveProfiles();
   switchProfile(name);
-  return true;
+  closeModal('modalAddAccount');
+  nameEl.value = '';
+  showFlash('Akun "' + name + '" berhasil dibuat', 'success');
 }
 
-function deleteProfile(name) {
-  if (name === 'Default' || profiles.length <= 1) return false;
-  profiles = profiles.filter(function(p) { return p !== name; });
-  var keys = Object.keys(localStorage);
-  keys.forEach(function(k) {
-    if (k.indexOf('_' + name) !== -1 || k.endsWith('_' + name)) localStorage.removeItem(k);
-  });
-  saveProfiles();
-  if (activeProfile === name) switchProfile(profiles[0]);
+function logoutAccount() {
+  localStorage.removeItem(ACTIVE_PROFILE_KEY);
+  activeProfile = '';
+  trades = [];
+  renderAll();
   renderProfileSelect();
-  return true;
+  renderInfoBar();
+  showLoginModal();
+}
+
+function showLoginModal() {
+  const sel = document.getElementById('loginProfileSelect');
+  if (firebaseReady && firestore && fbUser) {
+    firestore.collection('users').doc(fbUser.uid).get().then(function(snap) {
+      if (snap.exists) {
+        const data = snap.data();
+        if (data.profiles && Array.isArray(data.profiles)) {
+          sel.innerHTML = '<option value="">— Pilih akun —</option>' +
+            data.profiles.map(function(p) {
+              return '<option value="' + p.name + '">👤 ' + p.name + ' (' + p.mode + ', ' + p.accountType + ')</option>';
+            }).join('');
+        }
+      }
+    }).catch(function() {});
+  } else {
+    sel.innerHTML = '<option value="">— Firebase tidak tersedia —</option>';
+  }
+  document.getElementById('modalLogin').classList.add('active');
+}
+
+function loginToProfile() {
+  const sel = document.getElementById('loginProfileSelect');
+  const name = sel.value;
+  if (!name) { showFlash('Pilih akun terlebih dahulu', 'error'); return; }
+  if (firebaseReady && firestore && fbUser) {
+    firestore.collection('users').doc(fbUser.uid).get().then(function(snap) {
+      if (snap.exists) {
+        const data = snap.data();
+        if (data.profiles && Array.isArray(data.profiles)) {
+          const found = data.profiles.find(p => p.name === name);
+          if (found) {
+            profiles = data.profiles;
+            saveProfiles();
+            activeProfile = name;
+            saveActiveProfile();
+            const tradeKey = 'trades_' + name;
+            if (data[tradeKey]) {
+              trades = data[tradeKey];
+              localStorage.setItem(getTradeKey(), JSON.stringify(trades));
+            } else {
+              trades = [];
+              localStorage.removeItem(getTradeKey());
+            }
+            closeModal('modalLogin');
+            renderInfoBar();
+            renderProfileSelect();
+            renderAll();
+            showFlash('Login sebagai "' + name + '"', 'success');
+            return;
+          }
+        }
+      }
+      showFlash('Akun tidak ditemukan di cloud', 'error');
+    }).catch(function(e) {
+      showFlash('Gagal load dari cloud: ' + e.message, 'error');
+    });
+  } else {
+    showFlash('Firebase tidak tersedia', 'error');
+  }
 }
 
 document.getElementById('profileSelect').addEventListener('change', function() {
@@ -1009,7 +1220,7 @@ function autoUpdatePips() {
 }
 
 function autoUpdateUSD() {
-  const accountType = document.getElementById('accountType').value;
+  const accountType = getCurrentAccountType();
   if (accountType === 'IDR') {
     document.getElementById('usd').value = '';
     document.getElementById('usd').placeholder = 'isi manual';
@@ -1027,19 +1238,6 @@ function autoUpdateUSD() {
   }
 }
 
-function loadAccountType() {
-  try {
-    const saved = localStorage.getItem(getAccountKey());
-    if (saved && document.getElementById('accountType'))
-      document.getElementById('accountType').value = saved;
-  } catch {}
-}
-
-function saveAccountType() {
-  localStorage.setItem(getAccountKey(), document.getElementById('accountType').value);
-  syncToFirestore();
-}
-
 function updateAccountLabels() {
   const type = document.getElementById('accountType').value;
   const label = document.getElementById('usdLabel');
@@ -1054,12 +1252,6 @@ function updateAccountLabels() {
   const th = document.getElementById('thUSD');
   if (th) th.textContent = type === 'IDR' ? 'IDR' : 'USD';
 }
-
-document.getElementById('accountType').addEventListener('change', function() {
-  saveAccountType();
-  updateAccountLabels();
-  autoUpdateUSD();
-});
 
 document.getElementById('entry').addEventListener('input', autoUpdatePips);
 document.getElementById('exit').addEventListener('input', autoUpdatePips);
@@ -1092,7 +1284,7 @@ function renderStats() {
   pipEl.textContent = (totalPips >= 0 ? '+' : '') + totalPips.toFixed(1);
   pipEl.className = 'value ' + (totalPips > 0 ? 'win' : totalPips < 0 ? 'loss' : 'neutral');
   const usdEl = document.getElementById('statUSD');
-  const accountType = document.getElementById('accountType').value;
+  const accountType = getCurrentAccountType();
   const symbol = accountType === 'IDR' ? 'Rp' : '$';
   usdEl.textContent = (totalUSD >= 0 ? '+' : '') + symbol + totalUSD.toFixed(2);
   usdEl.className = 'value ' + (totalUSD > 0 ? 'win' : totalUSD < 0 ? 'loss' : 'neutral');
@@ -1210,8 +1402,9 @@ function openModal(title, body, confirmText, confirmClass, onConfirm) {
   document.getElementById('modalOverlay').classList.add('active');
 }
 
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('active');
+function closeModal(id) {
+  const el = document.getElementById(id || 'modalOverlay');
+  if (el) el.classList.remove('active');
   pendingAction = null;
 }
 
@@ -1438,8 +1631,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
 loadProfiles();
 loadActiveProfile();
 loadTrades();
-loadAccountType();
-updateAccountLabels();
+renderInfoBar();
 renderProfileSelect();
 renderAll();
 setupFilterListeners();
@@ -1450,8 +1642,7 @@ document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
 initFirebase().then(async function(fbOk) {
   if (fbOk) {
     await loadFromFirestore();
-    loadAccountType();
-    updateAccountLabels();
+    renderInfoBar();
     renderProfileSelect();
     renderAll();
   }
