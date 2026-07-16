@@ -673,7 +673,7 @@ tbody tr:last-child td { border-bottom: none; }
       <option value="USDCent">USDCent</option>
       <option value="IDR">IDR</option>
     </select>
-    <form id="tradeForm">
+    <form id="tradeForm" novalidate>
       <div class="form-row">
         <div class="form-group">
           <label for="tgl">Tanggal</label>
@@ -777,7 +777,7 @@ tbody tr:last-child td { border-bottom: none; }
       </div>
       <div class="form-actions">
         <button type="submit" class="btn btn-gold" id="submitBtn">💾 Simpan Trade</button>
-        <button type="reset" class="btn btn-secondary" id="resetBtn">↺ Reset</button>
+        <button type="button" class="btn btn-secondary" id="resetBtn" onclick="resetForm()">↺ Reset</button>
         <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none" onclick="cancelEdit()">↩ Batal</button>
       </div>
     </form>
@@ -1596,39 +1596,37 @@ function backupAll() {
 function restoreAll(event) {
   var file = event.target.files[0];
   if (!file) return;
+  event.target.value = '';
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
       var data = JSON.parse(e.target.result);
       if (!data.profiles || !data.trades) throw new Error('Format tidak valid');
-      profiles = migrateProfiles(data.profiles);
-      saveProfiles();
-      profiles.forEach(function(p) {
-        var key = 'xauusd_journal_trades_' + p.name;
-        if (data.trades[p.name]) {
-          localStorage.setItem(key, JSON.stringify(data.trades[p.name]));
-          if (firebaseReady && firestore && fbUser) {
-            firestore.collection('users').doc(fbUser.uid).set({
-              profiles: profiles,
-              ['trades_' + p.name]: data.trades[p.name]
-            }, { merge: true }).catch(function() {});
+      var count = data.profiles.length;
+      openModal('📤 Restore Data', 'Restore ' + count + ' profile? Semua data saat ini akan diganti.', 'Restore', 'btn-gold', function() {
+        profiles = migrateProfiles(data.profiles);
+        saveProfiles();
+        profiles.forEach(function(p) {
+          var key = 'xauusd_journal_trades_' + p.name;
+          if (data.trades[p.name]) {
+            localStorage.setItem(key, JSON.stringify(data.trades[p.name]));
+            if (firebaseReady && firestore && fbUser) {
+              firestore.collection('users').doc(fbUser.uid).set({
+                profiles: profiles,
+                ['trades_' + p.name]: data.trades[p.name]
+              }, { merge: true }).catch(function() {});
+            }
           }
-        }
+        });
+        activeProfile = profiles.length > 0 ? profiles[0].name : '';
+        saveActiveProfile();
+        window.location.reload();
       });
-      activeProfile = profiles.length > 0 ? profiles[0].name : '';
-      saveActiveProfile();
-      loadTrades();
-      renderInfoBar();
-      renderProfileSelect();
-      renderAll();
-      showFlash('✅ Restore selesai! ' + profiles.length + ' profile dipulihkan', 'success');
-      window.location.reload();
     } catch (err) {
       showFlash('Gagal restore: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
-  event.target.value = '';
 }
 
 function resetAllData() {
@@ -1972,7 +1970,7 @@ function editTrade(id) {
   document.getElementById('tp').value = t.tp || '';
   document.getElementById('exit').value = t.exit;
   document.getElementById('lot').value = t.lot || '0.01';
-  document.getElementById('usd').value = t.usd || '';
+  document.getElementById('usd').value = t.usd != null ? t.usd : '';
   document.getElementById('compliance').value = t.compliance;
   document.getElementById('emotion').value = t.emotion;
   document.getElementById('note').value = t.note || '';
@@ -1986,6 +1984,16 @@ function editTrade(id) {
 }
 
 function cancelEdit() {
+  if (editingId) {
+    openModal('↩ Batal Edit', 'Yakin ingin membatalkan perubahan? Data yang diedit tidak akan tersimpan.', 'Ya, Batal', 'btn-secondary', function() {
+      doCancelEdit();
+    });
+    return;
+  }
+  doCancelEdit();
+}
+
+function doCancelEdit() {
   editingId = null;
   document.getElementById('tradeForm').reset();
   document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
@@ -1995,6 +2003,13 @@ function cancelEdit() {
   document.getElementById('submitBtn').textContent = '💾 Simpan Trade';
   document.getElementById('cancelEditBtn').style.display = 'none';
   document.getElementById('resetBtn').style.display = '';
+}
+
+function resetForm() {
+  document.getElementById('tradeForm').reset();
+  document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+  document.getElementById('pair').selectedIndex = 0;
+  loadFormDefaults();
 }
 
 function confirmClear() {
@@ -2022,30 +2037,48 @@ function exportJSON() {
 function importJSON(event) {
   const file = event.target.files[0];
   if (!file) return;
+  event.target.value = '';
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data)) throw new Error('Format tidak valid');
+      if (data.length === 0) { showFlash('File kosong', 'info'); return; }
       data.forEach((t, i) => {
         if (!t.id) t.id = generateId();
-        if (!t.date) throw new Error(`Trade #${i+1} tidak memiliki tanggal`);
+        if (!t.date) throw new Error('Trade #' + (i+1) + ' tidak memiliki tanggal');
       });
-      const before = trades.length;
-      trades = trades.concat(data);
-      saveTrades();
-      renderAll();
-      showFlash(`Berhasil import ${data.length} trade (total: ${trades.length})`, 'success');
+      openModal('📤 Import Trade', 'Import ' + data.length + ' trade? Trade dengan ID yang sama akan dilewati.', 'Import', 'btn-gold', function() {
+        var existingIds = new Set(trades.map(function(t) { return t.id; }));
+        var before = trades.length;
+        data.forEach(function(t) {
+          if (!existingIds.has(t.id)) {
+            trades.push(t);
+            existingIds.add(t.id);
+          }
+        });
+        saveTrades();
+        renderAll();
+        showFlash('Berhasil import ' + (trades.length - before) + ' trade (dilewati: ' + (data.length - (trades.length - before)) + ')', 'success');
+      });
     } catch (err) {
       showFlash('Gagal import: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
+}
+  };
+  reader.readAsText(file);
   event.target.value = '';
 }
 
-document.getElementById('tradeForm').addEventListener('submit', function(e) {
+document.getElementById('tradeForm').addEventListener('submit', async function(e) {
   e.preventDefault();
+  var btn = document.getElementById('submitBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Menyimpan...';
+
   const date = document.getElementById('tgl').value;
   const session = document.getElementById('sesi').value;
   const pair = document.getElementById('pair').value.trim();
@@ -2064,6 +2097,8 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
 
   if (!date || !session || !pair || !direction || !entry || !exit) {
     showFlash('Harap isi field wajib: Tanggal, Sesi, Pair, Arah, Entry, Exit', 'error');
+    btn.disabled = false;
+    btn.textContent = editingId ? '✏️ Update Trade' : '💾 Simpan Trade';
     return;
   }
 
@@ -2071,6 +2106,8 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
   const exitNum = parseFloat(exit);
   if (isNaN(entryNum) || isNaN(exitNum)) {
     showFlash('Entry dan Exit harus berupa angka', 'error');
+    btn.disabled = false;
+    btn.textContent = editingId ? '✏️ Update Trade' : '💾 Simpan Trade';
     return;
   }
 
@@ -2084,11 +2121,38 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
     finalPips = calc.signedPips;
   }
 
-  if (editingId) {
-    var idx = trades.findIndex(function(tx) { return tx.id === editingId; });
-    if (idx !== -1) {
-      trades[idx] = {
-        id: editingId,
+  try {
+    if (editingId) {
+      var idx = trades.findIndex(function(tx) { return tx.id === editingId; });
+      if (idx !== -1) {
+        trades[idx] = {
+          id: editingId,
+          date: date,
+          session: session,
+          pair: pair,
+          setup: setup,
+          direction: direction,
+          entry: entryNum,
+          sl: sl || '',
+          tp: tp || '',
+          exit: exitNum,
+          pips: finalPips,
+          lot: lot || '0.01',
+          usd: usd || '0',
+          result: result,
+          compliance: compliance,
+          emotion: emotion,
+          note: note,
+          createdAt: trades[idx].createdAt
+        };
+      }
+      await saveTrades();
+      renderAll();
+      showFlash('Trade berhasil diupdate!', 'success');
+      doCancelEdit();
+    } else {
+      var trade = {
+        id: generateId(),
         date: date,
         session: session,
         pair: pair,
@@ -2105,41 +2169,23 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
         compliance: compliance,
         emotion: emotion,
         note: note,
-        createdAt: trades[idx].createdAt
+        createdAt: new Date().toISOString()
       };
+      trades.push(trade);
+      await saveTrades();
+      renderAll();
+      showFlash('Trade berhasil disimpan!', 'success');
+      this.reset();
+      document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+      document.getElementById('pair').selectedIndex = 0;
+      loadFormDefaults();
     }
-    showFlash('Trade berhasil diupdate!', 'success');
-    cancelEdit();
-  } else {
-    var trade = {
-      id: generateId(),
-      date: date,
-      session: session,
-      pair: pair,
-      setup: setup,
-      direction: direction,
-      entry: entryNum,
-      sl: sl || '',
-      tp: tp || '',
-      exit: exitNum,
-      pips: finalPips,
-      lot: lot || '0.01',
-      usd: usd || '0',
-      result: result,
-      compliance: compliance,
-      emotion: emotion,
-      note: note,
-      createdAt: new Date().toISOString()
-    };
-    trades.push(trade);
-    showFlash('Trade berhasil disimpan!', 'success');
-    this.reset();
-    document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
-    document.getElementById('pair').selectedIndex = 0;
-    loadFormDefaults();
+  } catch (err) {
+    showFlash('Gagal menyimpan: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingId ? '✏️ Update Trade' : '💾 Simpan Trade';
   }
-  saveTrades();
-  renderAll();
 });
 
 async function initApp() {
