@@ -1167,10 +1167,6 @@ function updateSyncStatus() {
       el.title = 'Tersambung ke Firebase';
     }
   } else if (window.location.protocol === 'file:') {
-    el.textContent = '☁️ Cloud';
-    el.className = 'header-badge badge-cloud';
-    el.title = 'Tersambung ke Firebase';
-  } else if (window.location.protocol === 'file:') {
     el.textContent = '💻 Local (file://)';
     el.className = 'header-badge badge-local';
     el.title = 'Buka via http:// agar Firebase bisa connect';
@@ -1635,6 +1631,9 @@ function resetAllData() {
       firestore.collection('users').doc(fbUser.uid).delete().catch(function() {});
     }
     localStorage.clear();
+    // Hanya hapus key milik journal, bukan data domain lain
+    var keys = Object.keys(localStorage).filter(function(k) { return k.startsWith('xauusd_'); });
+    keys.forEach(function(k) { localStorage.removeItem(k); });
     profiles = [];
     trades = [];
     activeProfile = '';
@@ -1791,6 +1790,9 @@ function renderStats() {
     if (t.result === 'Win') { curWin++; curLoss = 0; }
     else if (t.result === 'Loss') { curLoss++; curWin = 0; }
   }
+  // Reset streak jika trade terakhir adalah BE
+  var lastResult = sorted.length > 0 ? sorted[sorted.length - 1].result : null;
+  if (lastResult === 'BE') { curWin = 0; curLoss = 0; }
 
   document.getElementById('statTotal').textContent = total;
   document.getElementById('statWinRate').textContent = winRate + '%';
@@ -1833,11 +1835,10 @@ function resetFilters() {
 }
 
 function setupFilterListeners() {
-  var ids = ['filterPair', 'filterResult', 'filterSesi', 'filterSearch'];
-  ids.forEach(function(id) {
+  ['filterPair', 'filterResult', 'filterSesi'].forEach(function(id) {
     document.getElementById(id).addEventListener('change', renderTable);
-    document.getElementById(id).addEventListener('input', renderTable);
   });
+  document.getElementById('filterSearch').addEventListener('input', renderTable);
 }
 
 function renderTable() {
@@ -2189,41 +2190,49 @@ document.getElementById('tradeForm').addEventListener('submit', async function(e
 });
 
 async function initApp() {
-  showLoading();
+  try {
+    showLoading();
 
-  const fbStatus = await initFirebase();
+    const fbStatus = await initFirebase();
 
-  if (fbStatus === 'logged_in') {
-    const loaded = await loadFromFirestore();
-    if (!loaded) loadProfiles();
-  } else if (fbStatus === 'not_logged_in') {
-    loadProfiles();
+    if (fbStatus === 'logged_in') {
+      const loaded = await loadFromFirestore();
+      if (!loaded) loadProfiles();
+    } else if (fbStatus === 'not_logged_in') {
+      loadProfiles();
+      loadActiveProfile();
+      loadTrades();
+      renderInfoBar();
+      renderProfileSelect();
+      renderAll();
+      setupFilterListeners();
+      document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+      loadFormDefaults();
+      hideLoading();
+      document.getElementById('modalAuth').classList.add('active');
+      return;
+    } else {
+      loadProfiles();
+    }
+
     loadActiveProfile();
     loadTrades();
     renderInfoBar();
     renderProfileSelect();
     renderAll();
     setupFilterListeners();
+
     document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
     loadFormDefaults();
     hideLoading();
-    document.getElementById('modalAuth').classList.add('active');
-    return;
-  } else {
-    loadProfiles();
+    showFirstVisitModal();
+  } catch (err) {
+    console.error('Init error:', err);
+    var msg = document.querySelector('#loadingOverlay div:last-child');
+    if (msg) msg.textContent = '⚠️ Gagal memuat: ' + err.message;
+    hideLoading();
+    showFlash('Gagal inisialisasi: ' + err.message, 'error');
   }
-
-  loadActiveProfile();
-  loadTrades();
-  renderInfoBar();
-  renderProfileSelect();
-  renderAll();
-  setupFilterListeners();
-
-  document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
-  loadFormDefaults();
-  hideLoading();
-  showFirstVisitModal();
 }
 
 initApp();
