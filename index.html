@@ -1815,12 +1815,19 @@ initApp();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').then(function(reg) {
     reg.update();
+
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
     reg.addEventListener('updatefound', function() {
       var newSW = reg.installing;
       newSW.addEventListener('statechange', function() {
         if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-          showFlash('🔄 Update tersedia — refresh...', 'info');
-          setTimeout(function() { window.location.reload(); }, 1500);
+          showFlash('🔄 Update tersedia — memperbarui...', 'info');
         }
       });
     });
