@@ -202,6 +202,82 @@ header p { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
   background-position: right 10px center;
   padding-right: 28px;
 }
+
+/* Filter */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  align-items: end;
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.filter-group label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.filter-group select,
+.filter-group input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+.filter-group select:focus,
+.filter-group input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(240,185,11,0.15);
+}
+.filter-group select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+  min-width: 100px;
+}
+.filter-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+  align-self: center;
+  white-space: nowrap;
+}
+.btn-filter-reset {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-filter-reset:hover {
+  border-color: var(--loss);
+  color: var(--loss);
+}
+@media (max-width: 640px) {
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .filter-group select { min-width: auto; }
+  .filter-count { margin-left: 0; }
+}
 .form-group.full { grid-column: 1 / -1; }
 .form-actions {
   display: flex;
@@ -528,6 +604,41 @@ tbody tr:last-child td { border-bottom: none; }
   <!-- History -->
   <div class="section">
     <div class="section-title">📊 RIWAYAT TRADE</div>
+    <div class="filter-bar" id="filterBar">
+      <div class="filter-group">
+        <label>Pair</label>
+        <select id="filterPair">
+          <option value="All">All</option>
+          <option value="XAUUSD">XAUUSD</option>
+          <option value="BTCUSDT">BTCUSDT</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Hasil</label>
+        <select id="filterResult">
+          <option value="All">All</option>
+          <option value="Win">Win</option>
+          <option value="Loss">Loss</option>
+          <option value="BE">BE</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Sesi</label>
+        <select id="filterSesi">
+          <option value="All">All</option>
+          <option value="Asia">Asia</option>
+          <option value="London">London</option>
+          <option value="NY">New York</option>
+          <option value="Overlap">Overlap</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Cari</label>
+        <input type="text" id="filterSearch" placeholder="pair, setup, catatan...">
+      </div>
+      <button class="btn-filter-reset" onclick="resetFilters()">↺ Reset</button>
+      <div class="filter-count" id="filterCount"></div>
+    </div>
     <div class="table-wrapper">
       <table>
         <thead>
@@ -558,6 +669,11 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="icon">📭</div>
       <h3>Belum ada data trade</h3>
       <p>Mulai catat trade pertama Anda melalui form di atas.</p>
+    </div>
+    <div class="empty-state" id="emptyFilter" style="display:none">
+      <div class="icon">🔍</div>
+      <h3>Tidak ada trade yang cocok</h3>
+      <p>Coba ubah filter atau search Anda.</p>
     </div>
   </div>
 
@@ -943,17 +1059,66 @@ function renderStats() {
   document.getElementById('statCompliance').textContent = complianceRate + '%';
 }
 
+function getFilteredTrades() {
+  var pair = document.getElementById('filterPair').value;
+  var result = document.getElementById('filterResult').value;
+  var sesi = document.getElementById('filterSesi').value;
+  var search = document.getElementById('filterSearch').value.toLowerCase();
+  return trades.filter(function(t) {
+    if (pair !== 'All' && t.pair !== pair) return false;
+    if (result !== 'All' && t.result !== result) return false;
+    if (sesi !== 'All' && t.session !== sesi) return false;
+    if (search && !t.pair.toLowerCase().includes(search) &&
+        !(t.setup || '').toLowerCase().includes(search) &&
+        !(t.note || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+
+function resetFilters() {
+  document.getElementById('filterPair').value = 'All';
+  document.getElementById('filterResult').value = 'All';
+  document.getElementById('filterSesi').value = 'All';
+  document.getElementById('filterSearch').value = '';
+  renderTable();
+}
+
+function setupFilterListeners() {
+  var ids = ['filterPair', 'filterResult', 'filterSesi', 'filterSearch'];
+  ids.forEach(function(id) {
+    document.getElementById(id).addEventListener('change', renderTable);
+    document.getElementById(id).addEventListener('input', renderTable);
+  });
+}
+
 function renderTable() {
-  const tbody = document.getElementById('tradeBody');
-  const empty = document.getElementById('emptyState');
+  var filtered = getFilteredTrades();
+  var tbody = document.getElementById('tradeBody');
+  var empty = document.getElementById('emptyState');
+  var emptyFilter = document.getElementById('emptyFilter');
+  var countEl = document.getElementById('filterCount');
+
   if (trades.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
+    emptyFilter.style.display = 'none';
+    if (countEl) countEl.textContent = '';
     return;
   }
-  empty.style.display = 'none';
 
-  const sorted = [...trades].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'none';
+    emptyFilter.style.display = 'block';
+    if (countEl) countEl.textContent = '0 dari ' + trades.length + ' trade';
+    return;
+  }
+
+  empty.style.display = 'none';
+  emptyFilter.style.display = 'none';
+  if (countEl) countEl.textContent = filtered.length + ' dari ' + trades.length + ' trade';
+
+  var sorted = [...filtered].sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
   tbody.innerHTML = sorted.map(t => {
     const badgeResult = t.result === 'Win' ? 'badge-win' : t.result === 'Loss' ? 'badge-loss' : 'badge-be';
     const badgeCompliance = t.compliance === 'Yes' ? 'badge-yes' : t.compliance === 'Partial' ? 'badge-partial' : t.compliance === 'No' ? 'badge-no' : '';
@@ -1219,6 +1384,7 @@ loadAccountType();
 updateAccountLabels();
 renderProfileSelect();
 renderAll();
+setupFilterListeners();
 
 document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
 
