@@ -47,6 +47,14 @@ async function initApp() {
 
 initApp();
 
+// Trade action buttons (delegasi, aman dari XSS)
+document.getElementById('tradeBody').addEventListener('click', function(e) {
+  var editBtn = e.target.closest('[data-edit]');
+  var delBtn = e.target.closest('[data-delete]');
+  if (editBtn) editTrade(editBtn.dataset.edit);
+  if (delBtn) deleteTrade(delBtn.dataset.delete);
+});
+
 // Modal click-outside
 document.getElementById('modalAddAccount').addEventListener('click', function(e) {
   if (e.target === this) closeModal('modalAddAccount');

@@ -223,11 +223,11 @@ function renderTable() {
       <td><span class="badge ${badgeResult}">${escapeHtml(t.result || '-')}</span></td>
       <td class="${pipsVal > 0 ? 'text-win' : pipsVal < 0 ? 'text-loss' : ''}">${escapeHtml(t.pips || '0')}</td>
       <td>${escapeHtml(t.lot || '0.01')}</td>
-      <td>${t.usd ? '$' + parseFloat(t.usd).toFixed(2) : '-'}</td>
+      <td>${t.usd != null ? (getCurrentAccountType() === 'IDR' ? 'Rp' : '$') + parseFloat(t.usd).toFixed(2) : '-'}</td>
       <td>${badgeCompliance ? '<span class="badge ' + badgeCompliance + '">' + escapeHtml(t.compliance) + '</span>' : '-'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${escapeHtml(t.emotion || '-')}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-muted)" title="${escapeHtml(t.note || '')}">${escapeHtml(t.note || '-')}</td>
-      <td><button class="btn btn-xs btn-secondary" onclick="editTrade('${t.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="deleteTrade('${t.id}')">✕</button></td>
+      <td><button class="btn btn-xs btn-secondary" data-edit="${escapeHtml(t.id)}" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" data-delete="${escapeHtml(t.id)}">✕</button></td>
     </tr>`;
   }).join('');
 }
