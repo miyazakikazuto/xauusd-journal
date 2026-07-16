@@ -1,4 +1,4 @@
-const CACHE = 'xauusd-journal-v1';
+const CACHE = 'xauusd-journal-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -30,9 +30,16 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      caches.match(e.request).then(function(cached) {
-        return cached || fetch(e.request);
-      })
+      fetch(e.request)
+        .then(function(response) {
+          return caches.open(CACHE).then(function(cache) {
+            cache.put(e.request, response.clone());
+            return response;
+          });
+        })
+        .catch(function() {
+          return caches.match(e.request);
+        })
     );
     return;
   }

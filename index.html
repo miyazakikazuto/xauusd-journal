@@ -1461,7 +1461,17 @@ initFirebase().then(async function(fbOk) {
 </script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
+  navigator.serviceWorker.register('sw.js').then(function(reg) {
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          showFlash('🔄 Update tersedia — refresh...', 'info');
+          setTimeout(function() { window.location.reload(); }, 1500);
+        }
+      });
+    });
+  });
 }
 </script>
 </body>
