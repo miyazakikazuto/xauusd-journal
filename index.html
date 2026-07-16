@@ -647,6 +647,7 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="loading-overlay hidden" id="loadingOverlay">
   <div class="spinner"></div>
   <div id="loadingText" style="color:var(--text-muted);font-size:14px">☁️ Menghubungkan ke cloud...</div>
+  <button class="btn btn-secondary btn-sm" id="skipLoadingBtn" style="margin-top:12px">⏭ Skip, offline saja</button>
 </div>
 
 <div class="container">
@@ -1139,8 +1140,8 @@ function initFirebase() {
       console.warn('Firebase: buka via http:// atau https://, bukan file://');
       done('offline'); return;
     }
-    // Timeout: jika Firebase tidak merespon dalam 5 detik, lanjut offline
-    setTimeout(function() { done('offline'); }, 5000);
+    // Timeout: jika Firebase tidak merespon dalam 15 detik, lanjut offline
+    setTimeout(function() { done('offline'); }, 15000);
     try {
       let app;
       try { app = firebase.initializeApp(FIREBASE_CONFIG); }
@@ -1194,6 +1195,19 @@ function showLoading() {
   var isLocal = window.location.protocol === 'file:' || !window.location.href.startsWith('http');
   document.getElementById('loadingText').textContent = isLocal ? '📂 Memuat data lokal...' : '☁️ Menghubungkan ke cloud...';
   document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('skipLoadingBtn').onclick = function() {
+    hideLoading();
+    loadProfiles();
+    loadActiveProfile();
+    loadTrades();
+    renderInfoBar();
+    renderProfileSelect();
+    renderAll();
+    setupFilterListeners();
+    document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+    loadFormDefaults();
+    showFirstVisitModal();
+  };
 }
 function hideLoading() {
   document.getElementById('loadingOverlay').classList.add('hidden');
