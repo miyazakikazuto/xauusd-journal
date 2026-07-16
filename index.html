@@ -458,7 +458,7 @@ tbody tr:last-child td { border-bottom: none; }
   font-size: 14px;
   font-weight: 600;
   z-index: 2000;
-  animation: slideIn 0.3s ease;
+  animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
   max-width: 360px;
 }
 .flash-success { background: rgba(0,200,83,0.15); color: var(--win); border: 1px solid rgba(0,200,83,0.3); }
@@ -467,6 +467,10 @@ tbody tr:last-child td { border-bottom: none; }
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 /* Scrollbar */
@@ -484,6 +488,7 @@ tbody tr:last-child td { border-bottom: none; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .stat-card { padding: 10px; }
   .stat-card .value { font-size: 18px; }
+  .header-select { max-width: 140px; }
 }
 .profile-info-bar {
   background: var(--surface-2);
@@ -641,7 +646,7 @@ tbody tr:last-child td { border-bottom: none; }
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
-  <div style="color:var(--text-muted);font-size:14px">☁️ Menghubungkan ke cloud...</div>
+  <div id="loadingText" style="color:var(--text-muted);font-size:14px">☁️ Menghubungkan ke cloud...</div>
 </div>
 
 <div class="container">
@@ -849,7 +854,7 @@ tbody tr:last-child td { border-bottom: none; }
             <th>Plan</th>
             <th>Emosi</th>
             <th>Catatan</th>
-            <th style="width:50px">Aksi</th>
+            <th style="width:80px">Aksi</th>
           </tr>
         </thead>
         <tbody id="tradeBody">
@@ -1180,6 +1185,8 @@ function updateSyncStatus() {
 }
 
 function showLoading() {
+  var isLocal = window.location.protocol === 'file:' || !window.location.href.startsWith('http');
+  document.getElementById('loadingText').textContent = isLocal ? '📂 Memuat data lokal...' : '☁️ Menghubungkan ke cloud...';
   document.getElementById('loadingOverlay').classList.remove('hidden');
 }
 function hideLoading() {
@@ -1645,6 +1652,13 @@ function resetAllData() {
   });
 }
 
+document.getElementById('modalAddAccount').addEventListener('click', function(e) {
+  if (e.target === this) closeModal('modalAddAccount');
+});
+document.getElementById('modalAuth').addEventListener('click', function(e) {
+  if (e.target === this) closeModal('modalAuth');
+});
+
 document.getElementById('settingsProfileSelect') && document.getElementById('settingsProfileSelect').addEventListener('change', function() {
   var p = profiles.find(function(x) { return x.name === this.value; }.bind(this));
   if (p) {
@@ -1932,6 +1946,14 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeModal('modalOverlay');
+    closeModal('modalAddAccount');
+    closeModal('modalAuth');
+  }
+});
+
 // Tab switching
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-tab]');
@@ -2050,6 +2072,7 @@ function importJSON(event) {
         if (!t.date) throw new Error('Trade #' + (i+1) + ' tidak memiliki tanggal');
       });
       openModal('📤 Import Trade', 'Import ' + data.length + ' trade? Trade dengan ID yang sama akan dilewati.', 'Import', 'btn-gold', function() {
+        if (editingId) { cancelEdit(); }
         var existingIds = new Set(trades.map(function(t) { return t.id; }));
         var before = trades.length;
         data.forEach(function(t) {
