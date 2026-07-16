@@ -940,7 +940,7 @@ async function loadFromFirestore() {
     if (!snap.exists) return false;
     const data = snap.data();
     if (data.profiles) {
-      profiles = data.profiles;
+      profiles = migrateProfiles(data.profiles);
       localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
     }
     if (data.activeProfile) {
@@ -979,6 +979,16 @@ function getCurrentAccountType() {
 function getCurrentMode() {
   const p = getCurrentProfile();
   return p ? p.mode : 'Real';
+}
+
+function migrateProfiles(arr) {
+  if (!arr || !Array.isArray(arr) || arr.length === 0) return arr;
+  if (typeof arr[0] === 'string') {
+    return arr.map(function(name) {
+      return { name: name, mode: 'Real', accountType: 'USD' };
+    });
+  }
+  return arr;
 }
 
 function loadProfiles() {
@@ -1088,8 +1098,9 @@ function showLoginModal() {
       if (snap.exists) {
         const data = snap.data();
         if (data.profiles && Array.isArray(data.profiles)) {
+          var mig = migrateProfiles(data.profiles);
           sel.innerHTML = '<option value="">— Pilih akun —</option>' +
-            data.profiles.map(function(p) {
+            mig.map(function(p) {
               return '<option value="' + p.name + '">👤 ' + p.name + ' (' + p.mode + ', ' + p.accountType + ')</option>';
             }).join('');
         }
@@ -1110,9 +1121,10 @@ function loginToProfile() {
       if (snap.exists) {
         const data = snap.data();
         if (data.profiles && Array.isArray(data.profiles)) {
-          const found = data.profiles.find(p => p.name === name);
+          var mig = migrateProfiles(data.profiles);
+          const found = mig.find(p => p.name === name);
           if (found) {
-            profiles = data.profiles;
+            profiles = mig;
             saveProfiles();
             activeProfile = name;
             saveActiveProfile();
