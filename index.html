@@ -590,7 +590,6 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="header-right">
       <select id="profileSelect" class="header-select"></select>
       <button class="btn-icon" onclick="document.getElementById('modalAddAccount').classList.add('active')" title="Tambah Akun">➕</button>
-      <button class="btn btn-sm btn-secondary" onclick="logoutAccount()" title="Logout">🚪 Logout</button>
       <span class="header-badge badge-local" id="syncStatus">💻 Local</span>
     </div>
   </header>
@@ -1074,7 +1073,7 @@ function renderProfileSelect() {
   if (!sel) return;
   sel.innerHTML = profiles.map(function(p) {
     return '<option value="' + p.name + '" ' + (p.name === activeProfile ? 'selected' : '') + '>👤 ' + p.name + '</option>';
-  }).join('');
+  }).join('') + (profiles.length > 0 ? '<option value="__logout__" disabled>──────────</option><option value="__logout__">🚪 Logout</option>' : '');
 }
 
 function renderInfoBar() {
@@ -1194,6 +1193,7 @@ function showFirstVisitModal() {
 }
 
 document.getElementById('profileSelect').addEventListener('change', function() {
+  if (this.value === '__logout__') { logoutAccount(); return; }
   switchProfile(this.value);
 });
 
