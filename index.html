@@ -425,14 +425,18 @@ tbody tr:last-child td { border-bottom: none; }
           <input type="number" id="exit" step="any" placeholder="0.00" required>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row three">
         <div class="form-group">
           <label for="pips">Pips <span class="text-muted">(auto)</span></label>
           <input type="number" id="pips" step="any" readonly>
         </div>
         <div class="form-group">
-          <label for="usd">USD P/L</label>
-          <input type="number" id="usd" step="any" placeholder="0.00">
+          <label for="lot">Lot</label>
+          <input type="number" id="lot" step="0.01" value="0.01" min="0.01">
+        </div>
+        <div class="form-group">
+          <label for="usd">USD P/L <span class="text-muted">(auto)</span></label>
+          <input type="number" id="usd" step="any" placeholder="auto">
         </div>
       </div>
       <div class="form-row">
@@ -490,6 +494,7 @@ tbody tr:last-child td { border-bottom: none; }
             <th>Exit</th>
             <th>Hasil</th>
             <th>Pips</th>
+            <th>Lot</th>
             <th>USD</th>
             <th>Plan</th>
             <th>Emosi</th>
@@ -565,6 +570,14 @@ function getPipMultiplier(pair) {
   return 10000;
 }
 
+function getPipValue(pair) {
+  const upper = (pair || 'XAUUSD').toUpperCase();
+  if (upper.includes('XAU') || upper.includes('GOLD')) return 10;
+  if (upper.includes('XAG') || upper.includes('SILVER')) return 5;
+  if (upper.includes('BTC') || upper.includes('ETH') || upper.includes('SOL')) return 1;
+  return 10;
+}
+
 function calcResult(entry, exit, dir) {
   const e = parseFloat(entry), x = parseFloat(exit);
   if (isNaN(e) || isNaN(x)) return { result: '-', signedPips: 0 };
@@ -590,12 +603,24 @@ function autoUpdatePips() {
   const pipsField = document.getElementById('pips');
   const pips = getPipsFromExit();
   pipsField.value = pips !== '' ? pips : '';
+  autoUpdateUSD();
+}
+
+function autoUpdateUSD() {
+  const pips = parseFloat(document.getElementById('pips').value);
+  const lot = parseFloat(document.getElementById('lot').value);
+  const pair = document.getElementById('pair').value;
+  if (!isNaN(pips) && !isNaN(lot) && lot > 0) {
+    const pipValue = getPipValue(pair);
+    document.getElementById('usd').value = Math.round(pips * lot * pipValue * 100) / 100;
+  }
 }
 
 document.getElementById('entry').addEventListener('input', autoUpdatePips);
 document.getElementById('exit').addEventListener('input', autoUpdatePips);
 document.getElementById('arah').addEventListener('input', autoUpdatePips);
 document.getElementById('pair').addEventListener('change', autoUpdatePips);
+document.getElementById('lot').addEventListener('input', autoUpdateUSD);
 
 function renderStats() {
   const total = trades.length;
@@ -656,6 +681,7 @@ function renderTable() {
       <td>${t.exit || '-'}</td>
       <td><span class="badge ${badgeResult}">${t.result || '-'}</span></td>
       <td class="${pipsVal > 0 ? 'text-win' : pipsVal < 0 ? 'text-loss' : ''}">${t.pips || '0'}</td>
+      <td>${t.lot || '0.01'}</td>
       <td>${t.usd ? '$' + parseFloat(t.usd).toFixed(2) : '-'}</td>
       <td>${badgeCompliance ? `<span class="badge ${badgeCompliance}">${t.compliance}</span>` : '-'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${t.emotion || '-'}</td>
@@ -770,6 +796,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
   const tp = document.getElementById('tp').value;
   const exit = document.getElementById('exit').value;
   const pips = document.getElementById('pips').value;
+  const lot = document.getElementById('lot').value;
   const usd = document.getElementById('usd').value;
   const compliance = document.getElementById('compliance').value;
   const emotion = document.getElementById('emotion').value;
@@ -809,6 +836,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
     tp: tp || '',
     exit: exitNum,
     pips: finalPips,
+    lot: lot || '0.01',
     usd: usd || '0',
     result,
     compliance,
@@ -824,6 +852,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
   this.reset();
   document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
   document.getElementById('pair').selectedIndex = 0;
+  document.getElementById('lot').value = '0.01';
   document.getElementById('compliance').value = 'Yes';
   document.getElementById('emotion').value = 'Percaya Diri';
 });
