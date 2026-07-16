@@ -398,6 +398,9 @@ tbody tr:last-child td { border-bottom: none; }
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 .tab-btn {
   flex: 1;
@@ -479,6 +482,7 @@ tbody tr:last-child td { border-bottom: none; }
   .header-right { flex-wrap: wrap; justify-content: center; }
   .section { padding: 16px; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stats-secondary { grid-template-columns: repeat(2, 1fr); }
   .stat-card { padding: 10px; }
   .stat-card .value { font-size: 18px; }
 }
@@ -496,6 +500,14 @@ tbody tr:last-child td { border-bottom: none; }
   flex-wrap: wrap;
 }
 .profile-info-bar strong { color: var(--text); }
+.stats-secondary {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 16px;
+  gap: 8px;
+}
+.stats-secondary .stat-card { padding: 10px; }
+.stats-secondary .stat-card .value { font-size: 16px; }
+.stats-secondary .stat-card .label { font-size: 11px; }
 .modal .form-group {
   text-align: left;
   margin-bottom: 12px;
@@ -654,23 +666,19 @@ tbody tr:last-child td { border-bottom: none; }
     </div>
   </header>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="input">📝 Input</button>
+    <button class="tab-btn" data-tab="riwayat">📊 Riwayat</button>
+    <button class="tab-btn" data-tab="analisis">🧠 Analisis</button>
+    <button class="tab-btn" data-tab="pengaturan">⚙️ Pengaturan</button>
+  </div>
+
   <!-- Stats -->
   <div class="stats-grid" id="statsGrid">
     <div class="stat-card"><div class="label">Total Trades</div><div class="value gold" id="statTotal">0</div></div>
     <div class="stat-card"><div class="label">Win Rate</div><div class="value win" id="statWinRate">0%</div></div>
     <div class="stat-card"><div class="label">Total Pips</div><div class="value" id="statPips">0</div></div>
     <div class="stat-card"><div class="label">Total P/L</div><div class="value" id="statUSD">$0</div></div>
-    <div class="stat-card"><div class="label">Rata-rata Pips</div><div class="value" id="statAvgPips">0</div></div>
-    <div class="stat-card"><div class="label">Win Streak</div><div class="value win" id="statWinStreak">0</div></div>
-    <div class="stat-card"><div class="label">Loss Streak</div><div class="value loss" id="statLossStreak">0</div></div>
-    <div class="stat-card"><div class="label">Kepatuhan Plan</div><div class="value gold" id="statCompliance">0%</div></div>
-  </div>
-
-  <div class="tab-bar">
-    <button class="tab-btn active" data-tab="input">📝 Input</button>
-    <button class="tab-btn" data-tab="riwayat">📊 Riwayat</button>
-    <button class="tab-btn" data-tab="analisis">🧠 Analisis</button>
-    <button class="tab-btn" data-tab="pengaturan">⚙️ Pengaturan</button>
   </div>
 
   <!-- Tab Input -->
@@ -795,6 +803,12 @@ tbody tr:last-child td { border-bottom: none; }
   <!-- Tab Riwayat -->
   <div class="section tab-content" id="tab-riwayat">
     <div class="section-title">📊 RIWAYAT TRADE</div>
+    <div class="stats-grid stats-secondary">
+      <div class="stat-card"><div class="label">Rata-rata Pips</div><div class="value" id="statAvgPips">0</div></div>
+      <div class="stat-card"><div class="label">Win Streak</div><div class="value win" id="statWinStreak">0</div></div>
+      <div class="stat-card"><div class="label">Loss Streak</div><div class="value loss" id="statLossStreak">0</div></div>
+      <div class="stat-card"><div class="label">Kepatuhan Plan</div><div class="value gold" id="statCompliance">0%</div></div>
+    </div>
     <div class="filter-bar" id="filterBar">
       <div class="filter-group">
         <label>Pair</label>
