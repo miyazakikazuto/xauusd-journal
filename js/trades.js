@@ -238,7 +238,7 @@ function renderSortIcon() {
 
 function toggleExpand(id) {
   var detail = document.getElementById('detail-' + id);
-  var toggle = document.querySelector('[data-detail="' + id + '"] .expand-toggle');
+  var toggle = document.querySelector('[data-detail="' + id + '"]');
   if (detail && toggle) {
     var hidden = detail.hasAttribute('hidden');
     if (hidden) {
