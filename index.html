@@ -857,18 +857,15 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="modal-overlay" id="modalLogin">
   <div class="modal">
     <h3>🔑 Pilih Akun</h3>
-    <p>Pilih akun lokal yang tersimpan di device:</p>
+    <p>Pilih akun yang tersimpan di cloud:</p>
     <div class="form-group">
       <select id="loginProfileSelect" class="full-width">
         <option value="">— Pilih akun —</option>
       </select>
     </div>
-    <div class="btn-group" style="flex-direction:column;gap:8px">
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button class="btn btn-secondary" onclick="closeModal('modalLogin')">Batal</button>
-        <button class="btn btn-gold" onclick="loginToProfile()">🔑 Login</button>
-      </div>
-      <button class="btn btn-sm btn-secondary" onclick="syncFromCloud()">☁️ Sync dari Cloud</button>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closeModal('modalLogin')">Batal</button>
+      <button class="btn btn-gold" onclick="loginToProfile()">🔑 Login</button>
     </div>
   </div>
 </div>
@@ -1130,59 +1127,69 @@ function logoutAccount() {
 
 function showLoginModal() {
   const sel = document.getElementById('loginProfileSelect');
-  if (profiles.length > 0) {
-    sel.innerHTML = '<option value="">— Pilih akun lokal —</option>' +
-      profiles.map(function(p) {
-        return '<option value="' + p.name + '">👤 ' + p.name + ' (' + p.mode + ', ' + p.accountType + ')</option>';
-      }).join('');
-  } else {
-    sel.innerHTML = '<option value="">— Tidak ada akun —</option>';
-  }
+  sel.innerHTML = '<option value="">⏳ Memuat akun dari cloud...</option>';
   document.getElementById('modalLogin').classList.add('active');
+  if (!firebaseReady || !firestore || !fbUser) {
+    sel.innerHTML = '<option value="">— Firebase tidak tersedia —</option>';
+    return;
+  }
+  firestore.collection('users').doc(fbUser.uid).get().then(function(snap) {
+    if (snap.exists) {
+      const data = snap.data();
+      if (data.profiles && Array.isArray(data.profiles)) {
+        var mig = migrateProfiles(data.profiles);
+        sel.innerHTML = '<option value="">— Pilih akun cloud —</option>' +
+          mig.map(function(p) {
+            return '<option value="' + p.name + '">👤 ' + p.name + ' (' + p.mode + ', ' + p.accountType + ')</option>';
+          }).join('');
+        return;
+      }
+    }
+    sel.innerHTML = '<option value="">— Belum ada akun di cloud —</option>';
+  }).catch(function() {
+    sel.innerHTML = '<option value="">— Gagal load dari cloud —</option>';
+  });
 }
 
 function loginToProfile() {
   const sel = document.getElementById('loginProfileSelect');
   const name = sel.value;
   if (!name) { showFlash('Pilih akun terlebih dahulu', 'error'); return; }
-  if (!profiles.some(p => p.name === name)) { showFlash('Akun tidak ditemukan', 'error'); return; }
-  switchProfile(name);
-  closeModal('modalLogin');
-  showFlash('Login sebagai "' + name + '"', 'success');
-}
-
-function syncFromCloud() {
   if (!firebaseReady || !firestore || !fbUser) {
     showFlash('Firebase tidak tersedia', 'error');
     return;
   }
-  showFlash('🔄 Mengsync dari cloud...', 'info');
   firestore.collection('users').doc(fbUser.uid).get().then(function(snap) {
     if (snap.exists) {
       const data = snap.data();
-      if (data.profiles) {
-        profiles = migrateProfiles(data.profiles);
-        saveProfiles();
+      if (data.profiles && Array.isArray(data.profiles)) {
+        var mig = migrateProfiles(data.profiles);
+        const found = mig.find(p => p.name === name);
+        if (found) {
+          profiles = mig;
+          saveProfiles();
+          activeProfile = name;
+          saveActiveProfile();
+          const tradeKey = 'trades_' + name;
+          if (data[tradeKey]) {
+            trades = data[tradeKey];
+            localStorage.setItem(getTradeKey(), JSON.stringify(trades));
+          } else {
+            trades = [];
+            localStorage.removeItem(getTradeKey());
+          }
+          closeModal('modalLogin');
+          renderInfoBar();
+          renderProfileSelect();
+          renderAll();
+          showFlash('Login sebagai "' + name + '"', 'success');
+          return;
+        }
       }
-      if (data.activeProfile) {
-        activeProfile = data.activeProfile;
-        saveActiveProfile();
-      }
-      const tradeKey = 'trades_' + activeProfile;
-      if (data[tradeKey]) {
-        trades = data[tradeKey];
-        localStorage.setItem(getTradeKey(), JSON.stringify(trades));
-      }
-      renderInfoBar();
-      renderProfileSelect();
-      renderAll();
-      showFlash('✅ Sync selesai dari cloud', 'success');
-      closeModal('modalLogin');
-    } else {
-      showFlash('Tidak ada data di cloud', 'info');
     }
+    showFlash('Akun tidak ditemukan di cloud', 'error');
   }).catch(function(e) {
-    showFlash('Gagal sync: ' + e.message, 'error');
+    showFlash('Gagal load dari cloud: ' + e.message, 'error');
   });
 }
 
