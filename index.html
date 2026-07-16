@@ -411,7 +411,7 @@ tbody tr:last-child td { border-bottom: none; }
 
   <!-- Form -->
   <div class="section">
-    <div class="section-title">📝 INPUT TRADE</div>
+    <div class="section-title" id="formTitle">📝 INPUT TRADE</div>
     <form id="tradeForm">
       <div class="form-row">
         <div class="form-group">
@@ -516,8 +516,9 @@ tbody tr:last-child td { border-bottom: none; }
         </div>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-gold">💾 Simpan Trade</button>
-        <button type="reset" class="btn btn-secondary">↺ Reset</button>
+        <button type="submit" class="btn btn-gold" id="submitBtn">💾 Simpan Trade</button>
+        <button type="reset" class="btn btn-secondary" id="resetBtn">↺ Reset</button>
+        <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="display:none" onclick="cancelEdit()">↩ Batal</button>
       </div>
     </form>
   </div>
@@ -776,6 +777,7 @@ document.getElementById('profileSelect').addEventListener('change', function() {
 // ===== TRADE STORAGE =====
 let trades = [];
 let pendingAction = null;
+let editingId = null;
 
 function loadTrades() {
   try {
@@ -970,7 +972,7 @@ function renderTable() {
       <td>${badgeCompliance ? `<span class="badge ${badgeCompliance}">${t.compliance}</span>` : '-'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${t.emotion || '-'}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-muted)" title="${(t.note || '').replace(/"/g,'&quot;')}">${t.note || '-'}</td>
-      <td><button class="btn btn-xs btn-danger" onclick="deleteTrade('${t.id}')">✕</button></td>
+      <td><button class="btn btn-xs btn-secondary" onclick="editTrade('${t.id}')" title="Edit">✏️</button> <button class="btn btn-xs btn-danger" onclick="deleteTrade('${t.id}')">✕</button></td>
     </tr>`;
   }).join('');
 }
@@ -1019,6 +1021,46 @@ function deleteTrade(id) {
     renderAll();
     showFlash('Trade berhasil dihapus', 'info');
   });
+}
+
+function editTrade(id) {
+  const t = trades.find(function(tx) { return tx.id === id; });
+  if (!t) return;
+  editingId = id;
+  document.getElementById('tgl').value = t.date;
+  document.getElementById('sesi').value = t.session;
+  document.getElementById('pair').value = t.pair;
+  document.getElementById('setup').value = t.setup || '';
+  document.getElementById('arah').value = t.direction;
+  document.getElementById('entry').value = t.entry;
+  document.getElementById('sl').value = t.sl || '';
+  document.getElementById('tp').value = t.tp || '';
+  document.getElementById('exit').value = t.exit;
+  document.getElementById('lot').value = t.lot || '0.01';
+  document.getElementById('usd').value = t.usd || '';
+  document.getElementById('compliance').value = t.compliance;
+  document.getElementById('emotion').value = t.emotion;
+  document.getElementById('note').value = t.note || '';
+  document.getElementById('formTitle').textContent = '✏️ EDIT TRADE';
+  document.getElementById('submitBtn').textContent = '✏️ Update Trade';
+  document.getElementById('cancelEditBtn').style.display = '';
+  document.getElementById('resetBtn').style.display = 'none';
+  autoUpdatePips();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('tradeForm').reset();
+  document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+  document.getElementById('pair').selectedIndex = 0;
+  document.getElementById('lot').value = '0.01';
+  document.getElementById('compliance').value = 'Yes';
+  document.getElementById('emotion').value = 'Percaya Diri';
+  document.getElementById('formTitle').textContent = '📝 INPUT TRADE';
+  document.getElementById('submitBtn').textContent = '💾 Simpan Trade';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  document.getElementById('resetBtn').style.display = '';
 }
 
 function confirmClear() {
@@ -1108,37 +1150,64 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
     finalPips = calc.signedPips;
   }
 
-  const trade = {
-    id: generateId(),
-    date,
-    session,
-    pair,
-    setup,
-    direction,
-    entry: entryNum,
-    sl: sl || '',
-    tp: tp || '',
-    exit: exitNum,
-    pips: finalPips,
-    lot: lot || '0.01',
-    usd: usd || '0',
-    result,
-    compliance,
-    emotion,
-    note,
-    createdAt: new Date().toISOString()
-  };
-
-  trades.push(trade);
+  if (editingId) {
+    var idx = trades.findIndex(function(tx) { return tx.id === editingId; });
+    if (idx !== -1) {
+      trades[idx] = {
+        id: editingId,
+        date: date,
+        session: session,
+        pair: pair,
+        setup: setup,
+        direction: direction,
+        entry: entryNum,
+        sl: sl || '',
+        tp: tp || '',
+        exit: exitNum,
+        pips: finalPips,
+        lot: lot || '0.01',
+        usd: usd || '0',
+        result: result,
+        compliance: compliance,
+        emotion: emotion,
+        note: note,
+        createdAt: trades[idx].createdAt
+      };
+    }
+    showFlash('Trade berhasil diupdate!', 'success');
+    cancelEdit();
+  } else {
+    var trade = {
+      id: generateId(),
+      date: date,
+      session: session,
+      pair: pair,
+      setup: setup,
+      direction: direction,
+      entry: entryNum,
+      sl: sl || '',
+      tp: tp || '',
+      exit: exitNum,
+      pips: finalPips,
+      lot: lot || '0.01',
+      usd: usd || '0',
+      result: result,
+      compliance: compliance,
+      emotion: emotion,
+      note: note,
+      createdAt: new Date().toISOString()
+    };
+    trades.push(trade);
+    showFlash('Trade berhasil disimpan!', 'success');
+    this.reset();
+    document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+    document.getElementById('pair').selectedIndex = 0;
+    document.getElementById('lot').value = '0.01';
+    document.getElementById('compliance').value = 'Yes';
+    document.getElementById('emotion').value = 'Percaya Diri';
+  }
   saveTrades();
   renderAll();
-  showFlash('Trade berhasil disimpan!', 'success');
-  this.reset();
-  document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
-  document.getElementById('pair').selectedIndex = 0;
-  document.getElementById('lot').value = '0.01';
-  document.getElementById('compliance').value = 'Yes';
-  document.getElementById('emotion').value = 'Percaya Diri';
 });
 
 loadProfiles();
