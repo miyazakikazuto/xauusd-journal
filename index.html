@@ -601,8 +601,16 @@ function isFirebaseConfigured() {
 
 async function initFirebase() {
   if (!isFirebaseConfigured()) return false;
+  // Firebase Auth tidak support file:// protocol
+  if (window.location.protocol === 'file:') {
+    console.warn('Firebase: buka via http:// atau https://, bukan file://');
+    updateSyncStatus();
+    return false;
+  }
   try {
-    const app = firebase.initializeApp(FIREBASE_CONFIG);
+    let app;
+    try { app = firebase.initializeApp(FIREBASE_CONFIG); }
+    catch (e) { app = firebase.app(); }
     firestore = firebase.firestore(app);
     const auth = firebase.auth(app);
     const cred = await auth.signInAnonymously();
@@ -623,6 +631,11 @@ function updateSyncStatus() {
   if (firebaseReady) {
     el.textContent = '☁️ Cloud';
     el.className = 'header-badge badge-cloud';
+    el.title = 'Tersambung ke Firebase';
+  } else if (window.location.protocol === 'file:') {
+    el.textContent = '💻 Local (file://)';
+    el.className = 'header-badge badge-local';
+    el.title = 'Buka via http:// agar Firebase bisa connect';
   } else if (isFirebaseConfigured()) {
     el.textContent = '⚠️ Offline';
     el.className = 'header-badge badge-offline';
