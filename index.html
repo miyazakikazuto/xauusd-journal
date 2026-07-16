@@ -387,7 +387,10 @@ tbody tr:last-child td { border-bottom: none; }
       <div class="form-row">
         <div class="form-group">
           <label for="pair">Pair</label>
-          <input type="text" id="pair" value="XAUUSD" required>
+          <select id="pair" required>
+            <option value="XAUUSD">XAUUSD</option>
+            <option value="BTCUSDT">BTCUSDT</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="setup">Setup / Timeframe</label>
@@ -592,7 +595,7 @@ function autoUpdatePips() {
 document.getElementById('entry').addEventListener('input', autoUpdatePips);
 document.getElementById('exit').addEventListener('input', autoUpdatePips);
 document.getElementById('arah').addEventListener('input', autoUpdatePips);
-document.getElementById('pair').addEventListener('input', autoUpdatePips);
+document.getElementById('pair').addEventListener('change', autoUpdatePips);
 
 function renderStats() {
   const total = trades.length;
@@ -820,7 +823,7 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
   showFlash('Trade berhasil disimpan!', 'success');
   this.reset();
   document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
-  document.getElementById('pair').value = 'XAUUSD';
+  document.getElementById('pair').selectedIndex = 0;
   document.getElementById('compliance').value = 'Yes';
   document.getElementById('emotion').value = 'Percaya Diri';
 });
