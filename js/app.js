@@ -57,19 +57,22 @@ document.getElementById('tradeBody').addEventListener('click', function(e) {
   if (detailBtn) toggleExpand(detailBtn.dataset.detail);
 });
 
-document.querySelector('#trades table').addEventListener('click', function(e) {
-  var th = e.target.closest('th.sortable');
-  if (th) {
-    var col = th.dataset.sort;
-    if (sortState.col === col) {
-      sortState.asc = !sortState.asc;
-    } else {
-      sortState.col = col;
-      sortState.asc = false;
+var sortTable = document.querySelector('#tab-riwayat table');
+if (sortTable) {
+  sortTable.addEventListener('click', function(e) {
+    var th = e.target.closest('th.sortable');
+    if (th) {
+      var col = th.dataset.sort;
+      if (sortState.col === col) {
+        sortState.asc = !sortState.asc;
+      } else {
+        sortState.col = col;
+        sortState.asc = false;
+      }
+      renderTable();
     }
-    renderTable();
-  }
-});
+  });
+}
 
 // Modal click-outside
 document.getElementById('modalAddAccount').addEventListener('click', function(e) {
