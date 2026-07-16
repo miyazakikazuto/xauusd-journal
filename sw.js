@@ -1,9 +1,14 @@
-const CACHE = 'xauusd-journal-v3';
+const CACHE = 'xauusd-journal-v4';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg'
+  './icon.svg',
+  './css/style.css',
+  './js/firebase.js',
+  './js/profiles.js',
+  './js/trades.js',
+  './js/app.js'
 ];
 
 self.addEventListener('install', function(e) {
