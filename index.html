@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trading Journal XAUUSD</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117">
 <style>
 :root {
   --bg: #0d1117;
@@ -1230,6 +1232,11 @@ initFirebase().then(async function(fbOk) {
     renderAll();
   }
 });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
 </script>
 </body>
 </html>
