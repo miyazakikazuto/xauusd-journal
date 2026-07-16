@@ -374,7 +374,7 @@ tbody tr:last-child td { border-bottom: none; }
     <div class="header-right">
       <select id="accountType" class="header-select">
         <option value="USD">🇺🇸 USD</option>
-        <option value="USDCent">💵 USDCent (×100)</option>
+        <option value="USDCent">💵 USDCent (÷100)</option>
         <option value="IDR">🇮🇩 IDR</option>
       </select>
       <span class="header-badge">LocalStorage</span>
@@ -649,7 +649,7 @@ function autoUpdateUSD() {
   if (!isNaN(pips) && !isNaN(lot) && lot > 0) {
     const pipValue = getPipValue(pair);
     let result = pips * lot * pipValue;
-    if (accountType === 'USDCent') result *= 100;
+    if (accountType === 'USDCent') result /= 100;
     document.getElementById('usd').value = Math.round(result * 100) / 100;
   }
 }
@@ -672,14 +672,14 @@ function updateAccountLabels() {
   const label = document.getElementById('usdLabel');
   const mappings = {
     'USD': 'USD P/L <span class="text-muted">(auto)</span>',
-    'USDCent': 'USDC P/L <span class="text-muted">(auto ×100)</span>',
+    'USDCent': 'USD P/L <span class="text-muted">(auto ÷100)</span>',
     'IDR': 'IDR P/L <span class="text-muted">(manual)</span>'
   };
   label.innerHTML = mappings[type] || mappings.USD;
   const statLabel = document.querySelector('.stat-card:nth-child(4) .label');
-  if (statLabel) statLabel.textContent = type === 'IDR' ? 'Total P/L (IDR)' : type === 'USDCent' ? 'Total P/L (¢)' : 'Total P/L';
+  if (statLabel) statLabel.textContent = type === 'IDR' ? 'Total P/L (IDR)' : 'Total P/L';
   const th = document.getElementById('thUSD');
-  if (th) th.textContent = type === 'IDR' ? 'IDR' : type === 'USDCent' ? 'USDC' : 'USD';
+  if (th) th.textContent = type === 'IDR' ? 'IDR' : 'USD';
 }
 
 document.getElementById('accountType').addEventListener('change', function() {
@@ -720,7 +720,7 @@ function renderStats() {
   pipEl.className = 'value ' + (totalPips > 0 ? 'win' : totalPips < 0 ? 'loss' : 'neutral');
   const usdEl = document.getElementById('statUSD');
   const accountType = document.getElementById('accountType').value;
-  const symbol = accountType === 'IDR' ? 'Rp' : accountType === 'USDCent' ? '¢' : '$';
+  const symbol = accountType === 'IDR' ? 'Rp' : '$';
   usdEl.textContent = (totalUSD >= 0 ? '+' : '') + symbol + totalUSD.toFixed(2);
   usdEl.className = 'value ' + (totalUSD > 0 ? 'win' : totalUSD < 0 ? 'loss' : 'neutral');
   document.getElementById('statAvgPips').textContent = avgPips.toFixed(1);
