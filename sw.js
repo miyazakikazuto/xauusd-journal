@@ -1,4 +1,4 @@
-const CACHE = 'xauusd-journal-v2';
+const CACHE = 'xauusd-journal-v3';
 const ASSETS = [
   './',
   './index.html',
