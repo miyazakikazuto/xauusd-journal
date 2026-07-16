@@ -73,14 +73,26 @@ header p { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
   box-shadow: 0 0 0 2px rgba(240,185,11,0.15);
 }
 .header-badge {
-  background: rgba(240,185,11,0.12);
-  color: var(--gold);
-  border: 1px solid rgba(240,185,11,0.25);
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.5px;
+}
+.badge-local {
+  background: rgba(240,185,11,0.12);
+  color: var(--gold);
+  border: 1px solid rgba(240,185,11,0.25);
+}
+.badge-cloud {
+  background: rgba(0,200,83,0.12);
+  color: var(--win);
+  border: 1px solid rgba(0,200,83,0.25);
+}
+.badge-offline {
+  background: rgba(255,82,82,0.12);
+  color: var(--loss);
+  border: 1px solid rgba(255,82,82,0.25);
 }
 
 /* Stats */
@@ -362,6 +374,9 @@ tbody tr:last-child td { border-bottom: none; }
   .stat-card .value { font-size: 18px; }
 }
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -372,12 +387,13 @@ tbody tr:last-child td { border-bottom: none; }
       <p>Catat. Evaluasi. Disiplin. — XAUUSD & Forex</p>
     </div>
     <div class="header-right">
+      <select id="profileSelect" class="header-select"></select>
       <select id="accountType" class="header-select">
         <option value="USD">🇺🇸 USD</option>
         <option value="USDCent">💵 USDCent (÷100)</option>
         <option value="IDR">🇮🇩 IDR</option>
       </select>
-      <span class="header-badge">LocalStorage</span>
+      <span class="header-badge badge-local" id="syncStatus">💻 Local</span>
     </div>
   </header>
 
@@ -564,19 +580,200 @@ tbody tr:last-child td { border-bottom: none; }
 </div>
 
 <script>
-const STORAGE_KEY = 'xauusd_journal_trades';
+// ===== FIREBASE =====
+const FIREBASE_CONFIG = {
+  apiKey: "isi-dari-firebase-console",
+  authDomain: "isi-dari-firebase-console",
+  projectId: "isi-dari-firebase-console",
+  storageBucket: "isi-dari-firebase-console",
+  messagingSenderId: "isi-dari-firebase-console",
+  appId: "isi-dari-firebase-console"
+};
+
+let firebaseReady = false;
+let firestore = null;
+let fbUser = null;
+
+function isFirebaseConfigured() {
+  return FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.length > 10 &&
+         FIREBASE_CONFIG.apiKey !== "isi-dari-firebase-console";
+}
+
+async function initFirebase() {
+  if (!isFirebaseConfigured()) return false;
+  try {
+    const app = firebase.initializeApp(FIREBASE_CONFIG);
+    firestore = firebase.firestore(app);
+    const auth = firebase.auth(app);
+    const cred = await auth.signInAnonymously();
+    fbUser = cred.user;
+    firebaseReady = true;
+    updateSyncStatus();
+    return true;
+  } catch (e) {
+    console.warn('Firebase: ' + e.message);
+    updateSyncStatus();
+    return false;
+  }
+}
+
+function updateSyncStatus() {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (firebaseReady) {
+    el.textContent = '☁️ Cloud';
+    el.className = 'header-badge badge-cloud';
+  } else if (isFirebaseConfigured()) {
+    el.textContent = '⚠️ Offline';
+    el.className = 'header-badge badge-offline';
+  } else {
+    el.textContent = '💻 Local';
+    el.className = 'header-badge badge-local';
+  }
+}
+
+async function syncToFirestore() {
+  if (!firebaseReady || !firestore || !fbUser) return;
+  try {
+    const batch = {};
+    batch.profiles = profiles;
+    batch.activeProfile = activeProfile;
+    batch['trades_' + activeProfile] = trades;
+    batch['account_' + activeProfile] = document.getElementById('accountType').value;
+    await firestore.collection('users').doc(fbUser.uid).set(batch, { merge: true });
+  } catch (e) {
+    console.warn('Firestore sync: ' + e.message);
+  }
+}
+
+async function loadFromFirestore() {
+  if (!firebaseReady || !firestore || !fbUser) return false;
+  try {
+    const snap = await firestore.collection('users').doc(fbUser.uid).get();
+    if (!snap.exists) return false;
+    const data = snap.data();
+    if (data.profiles) {
+      profiles = data.profiles;
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+    }
+    if (data.activeProfile) {
+      activeProfile = data.activeProfile;
+      localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfile);
+    }
+    const tradeKey = 'trades_' + activeProfile;
+    if (data[tradeKey]) {
+      trades = data[tradeKey];
+      localStorage.setItem(getTradeKey(), JSON.stringify(trades));
+    }
+    const accKey = 'account_' + activeProfile;
+    if (data[accKey]) localStorage.setItem(getAccountKey(), data[accKey]);
+    return true;
+  } catch (e) {
+    console.warn('Firestore load: ' + e.message);
+    return false;
+  }
+}
+
+// ===== PROFILE MANAGEMENT =====
+const PROFILES_KEY = 'xauusd_journal_profiles';
+const ACTIVE_PROFILE_KEY = 'xauusd_journal_active_profile';
+let activeProfile = 'Default';
+let profiles = ['Default'];
+
+function getTradeKey() { return 'xauusd_journal_trades_' + activeProfile; }
+function getAccountKey() { return 'xauusd_journal_account_' + activeProfile; }
+
+function loadProfiles() {
+  try {
+    const saved = localStorage.getItem(PROFILES_KEY);
+    if (saved) { profiles = JSON.parse(saved); return; }
+    // Migrate old single-profile data
+    const oldTrades = localStorage.getItem('xauusd_journal_trades');
+    if (oldTrades) {
+      localStorage.setItem(getTradeKey(), oldTrades);
+      localStorage.removeItem('xauusd_journal_trades');
+    }
+    saveProfiles();
+  } catch { profiles = ['Default']; }
+}
+
+function saveProfiles() {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+  syncToFirestore();
+}
+
+function loadActiveProfile() {
+  try {
+    const saved = localStorage.getItem(ACTIVE_PROFILE_KEY);
+    if (saved && profiles.includes(saved)) activeProfile = saved;
+  } catch {}
+}
+
+function saveActiveProfile() {
+  localStorage.setItem(ACTIVE_PROFILE_KEY, activeProfile);
+  syncToFirestore();
+}
+
+function renderProfileSelect() {
+  const sel = document.getElementById('profileSelect');
+  if (!sel) return;
+  sel.innerHTML = profiles.map(function(p) {
+    return '<option value="' + p + '" ' + (p === activeProfile ? 'selected' : '') + '>📁 ' + p + '</option>';
+  }).join('');
+}
+
+function switchProfile(name) {
+  if (name === activeProfile || !profiles.includes(name)) return;
+  saveTrades();
+  activeProfile = name;
+  saveActiveProfile();
+  loadTrades();
+  loadAccountType();
+  updateAccountLabels();
+  renderProfileSelect();
+  renderAll();
+}
+
+function addProfile(name) {
+  name = name.trim();
+  if (!name || profiles.includes(name)) return false;
+  profiles.push(name);
+  saveProfiles();
+  switchProfile(name);
+  return true;
+}
+
+function deleteProfile(name) {
+  if (name === 'Default' || profiles.length <= 1) return false;
+  profiles = profiles.filter(function(p) { return p !== name; });
+  var keys = Object.keys(localStorage);
+  keys.forEach(function(k) {
+    if (k.indexOf('_' + name) !== -1 || k.endsWith('_' + name)) localStorage.removeItem(k);
+  });
+  saveProfiles();
+  if (activeProfile === name) switchProfile(profiles[0]);
+  renderProfileSelect();
+  return true;
+}
+
+document.getElementById('profileSelect').addEventListener('change', function() {
+  switchProfile(this.value);
+});
+
+// ===== TRADE STORAGE =====
 let trades = [];
 let pendingAction = null;
 
 function loadTrades() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
+    const data = localStorage.getItem(getTradeKey());
     trades = data ? JSON.parse(data) : [];
   } catch { trades = []; }
 }
 
-function saveTrades() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+async function saveTrades() {
+  localStorage.setItem(getTradeKey(), JSON.stringify(trades));
+  await syncToFirestore();
 }
 
 function generateId() {
@@ -654,17 +851,17 @@ function autoUpdateUSD() {
   }
 }
 
-const ACCOUNT_TYPE_KEY = 'xauusd_journal_account_type';
-
 function loadAccountType() {
   try {
-    const saved = localStorage.getItem(ACCOUNT_TYPE_KEY);
-    if (saved) document.getElementById('accountType').value = saved;
+    const saved = localStorage.getItem(getAccountKey());
+    if (saved && document.getElementById('accountType'))
+      document.getElementById('accountType').value = saved;
   } catch {}
 }
 
 function saveAccountType() {
-  localStorage.setItem(ACCOUNT_TYPE_KEY, document.getElementById('accountType').value);
+  localStorage.setItem(getAccountKey(), document.getElementById('accountType').value);
+  syncToFirestore();
 }
 
 function updateAccountLabels() {
@@ -931,12 +1128,26 @@ document.getElementById('tradeForm').addEventListener('submit', function(e) {
   document.getElementById('emotion').value = 'Percaya Diri';
 });
 
+loadProfiles();
+loadActiveProfile();
 loadTrades();
 loadAccountType();
 updateAccountLabels();
+renderProfileSelect();
 renderAll();
 
 document.getElementById('tgl').value = new Date().toISOString().slice(0,10);
+
+// Init Firebase after initial render (non-blocking)
+initFirebase().then(async function(fbOk) {
+  if (fbOk) {
+    await loadFromFirestore();
+    loadAccountType();
+    updateAccountLabels();
+    renderProfileSelect();
+    renderAll();
+  }
+});
 </script>
 </body>
 </html>
