@@ -312,9 +312,16 @@ header p { color: var(--text-muted); font-size: 14px; margin-top: 2px; }
 }
 table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 13px;
 }
+thead th:nth-child(1) { width: 4%; min-width: 32px; }
+thead th:nth-child(2) { width: 15%; }
+thead th:nth-child(3) { width: 18%; }
+thead th:nth-child(4) { width: 24%; }
+thead th:nth-child(5) { width: 24%; }
+thead th:nth-child(6) { width: 15%; }
 thead th {
   background: var(--surface-2);
   color: var(--text-muted);

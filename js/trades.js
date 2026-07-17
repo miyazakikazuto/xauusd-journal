@@ -149,8 +149,13 @@ function updateAccountLabels() {
   label.innerHTML = mappings[type] || mappings.USD;
   const statLabel = document.querySelector('.stat-card:nth-child(4) .label');
   if (statLabel) statLabel.textContent = type === 'IDR' ? 'Total P/L (IDR)' : 'Total P/L';
-  const th = document.getElementById('thUSD');
-  if (th) th.textContent = type === 'IDR' ? 'IDR' : 'USD';
+  const th = document.querySelector('th.sortable[data-sort="usd"]');
+  if (th) {
+    var pnlLabel = 'PnL';
+    if (type === 'IDR') pnlLabel = 'PnL (IDR)';
+    else if (type === 'USDCent') pnlLabel = 'PnL (¢)';
+    th.childNodes[0].textContent = pnlLabel;
+  }
 }
 
 document.getElementById('entry').addEventListener('input', autoUpdatePips);
